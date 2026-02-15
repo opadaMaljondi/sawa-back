@@ -12,6 +12,7 @@ class CourseSection extends Model
     protected $fillable = [
         'course_id',
         'title',
+        'description',
         'order',
         'price',
     ];
@@ -27,7 +28,7 @@ class CourseSection extends Model
 
     public function lessons()
     {
-        return $this->hasMany(Lesson::class);
+        return $this->hasMany(Lesson::class, 'section_id');
     }
 }
 

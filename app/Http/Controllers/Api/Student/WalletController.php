@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\Wallet;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 
@@ -20,14 +21,18 @@ class WalletController extends Controller
      */
     public function balance()
     {
-        $balance = $this->walletService->getBalance(auth()->id());
-        $wallet = auth()->user()->wallet;
+        $userId = auth()->id();
+        $balance = $this->walletService->getBalance($userId);
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $userId],
+            ['balance' => 0, 'currency' => 'SYP']
+        );
 
         return response()->json([
             'balance' => $balance,
-            'currency' => $wallet->currency ?? 'IQD',
-            'total_deposited' => $wallet->total_deposited ?? 0,
-            'total_spent' => $wallet->total_spent ?? 0,
+            'currency' => $wallet->currency ?? 'SYP',
+            'total_deposited' => (float) ($wallet->total_deposited ?? 0),
+            'total_spent' => (float) ($wallet->total_spent ?? 0),
         ]);
     }
 

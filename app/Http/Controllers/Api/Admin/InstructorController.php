@@ -127,7 +127,6 @@ class InstructorController extends Controller
             'price' => $request->price,
             'status' => 'published',
             'active' => true,
-            'is_approved' => true,
         ]);
 
         return response()->json([

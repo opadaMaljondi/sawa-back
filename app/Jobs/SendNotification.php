@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\FirebaseService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -13,18 +14,21 @@ class SendNotification implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Create a new job instance.
+     * @param int[] $userIds User IDs to send FCM notification to (their devices' fcm_token will be used)
+     * @param array<string, string> $data Optional data payload (values must be strings for FCM)
      */
-    public function __construct()
-    {
-        //
-    }
+    public function __construct(
+        public string $title,
+        public string $body,
+        public array $userIds = [],
+        public array $data = []
+    ) {}
 
-    /**
-     * Execute the job.
-     */
-    public function handle(): void
+    public function handle(FirebaseService $firebase): void
     {
-        //
+        if (empty($this->userIds)) {
+            return;
+        }
+        $firebase->sendNotificationToUsers($this->userIds, $this->title, $this->body, $this->data);
     }
 }

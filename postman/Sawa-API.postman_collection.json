@@ -1,0 +1,1834 @@
+{
+	"info": {
+		"_postman_id": "sawa-api-collection",
+		"name": "Sawa API",
+		"description": "Sawa Course Management System - API Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "Auth (Public)",
+			"item": [
+				{
+					"name": "Register (General)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Student Name\",\n  \"email\": \"student@example.com\",\n  \"phone\": \"07501234567\",\n  \"password\": \"password\",\n  \"password_confirmation\": \"password\"\n}"
+						},
+						"url": "{{base_url}}/auth/register"
+					}
+				},
+				{
+					"name": "Login (General - email or phone)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"login\": \"admin@sawa.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": "{{base_url}}/auth/login"
+					}
+				},
+				{
+					"name": "Student - Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Student Name\",\n  \"email\": \"student@example.com\",\n  \"phone\": \"07501234568\",\n  \"password\": \"password\",\n  \"password_confirmation\": \"password\",\n  \"referral_code\": null\n}"
+						},
+						"url": "{{base_url}}/auth/student/register"
+					}
+				},
+				{
+					"name": "Student - Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"login\": \"student@example.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": "{{base_url}}/auth/student/login"
+					}
+				},
+				{
+					"name": "Instructor - Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"login\": \"instructor@example.com\",\n  \"password\": \"password\"\n}"
+						},
+						"url": "{{base_url}}/auth/instructor/login"
+					}
+				}
+			]
+		},
+		{
+			"name": "Logout",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": "{{base_url}}/logout"
+			}
+		},
+		{
+			"name": "Student",
+			"item": [
+				{
+					"name": "Courses",
+					"item": [
+						{
+							"name": "Home",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/home"
+							}
+						},
+						{
+							"name": "Departments",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/departments"
+							}
+						},
+						{
+							"name": "Courses by Subject",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/courses/subject/1"
+							}
+						},
+						{
+							"name": "Search Courses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/courses"
+							}
+						},
+						{
+							"name": "Show Course",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/courses/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Enrollments",
+					"item": [
+						{
+							"name": "My Enrollments",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/enrollments"
+							}
+						},
+						{
+							"name": "Enroll",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"type\": \"full_course\",\n  \"coupon_code\": null\n}"
+								},
+								"url": "{{base_url}}/student/enrollments"
+							}
+						}
+					]
+				},
+				{
+					"name": "Wallet",
+					"item": [
+						{
+							"name": "Balance",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/wallet/balance"
+							}
+						},
+						{
+							"name": "Transactions",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/wallet/transactions"
+							}
+						},
+						{
+							"name": "Deposit",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"amount\": 10000,\n  \"payment_method\": \"admin\",\n  \"barcode\": null\n}"
+								},
+								"url": "{{base_url}}/student/wallet/deposit"
+							}
+						}
+					]
+				},
+				{
+					"name": "Video Downloads",
+					"item": [
+						{
+							"name": "Downloaded Videos",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/videos/downloaded"
+							}
+						},
+						{
+							"name": "Download Video",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/videos/1/download"
+							}
+						},
+						{
+							"name": "Stream Video",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/videos/{{token}}/stream?signature=xxx"
+							}
+						},
+						{
+							"name": "Delete Downloaded Video",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/videos/{{token}}"
+							}
+						}
+					]
+				},
+				{
+					"name": "Chat",
+					"item": [
+						{
+							"name": "My Chats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/chats"
+							}
+						},
+						{
+							"name": "Chat Messages",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/chats/1/messages"
+							}
+						},
+						{
+							"name": "Send Message",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"message\": \"Hello\"\n}"
+								},
+								"url": "{{base_url}}/student/chats/1/messages"
+							}
+						}
+					]
+				},
+				{
+					"name": "Referrals",
+					"item": [
+						{
+							"name": "My Referral Code",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/referrals/code"
+							}
+						},
+						{
+							"name": "Referral Stats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/referrals/stats"
+							}
+						},
+						{
+							"name": "My Referrals",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/student/referrals"
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Instructor",
+			"item": [
+				{
+					"name": "Courses",
+					"item": [
+						{
+							"name": "My Courses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses"
+							}
+						},
+						{
+							"name": "Create Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subject_id\": 1,\n  \"title\": \"Course Title\",\n  \"description\": \"Description\",\n  \"price\": 50000,\n  \"allow_section_purchase\": true,\n  \"allow_lesson_purchase\": false,\n  \"free_first_lesson\": true\n}"
+								},
+								"url": "{{base_url}}/instructor/courses"
+							}
+						},
+						{
+							"name": "Update Course",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Title\",\n  \"description\": \"Updated description\",\n  \"price\": 60000\n}"
+								},
+								"url": "{{base_url}}/instructor/courses/1"
+							}
+						},
+						{
+							"name": "Course Stats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses/1/stats"
+							}
+						}
+					]
+				},
+				{
+					"name": "Videos",
+					"item": [
+						{
+							"name": "Upload Video",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "course_id", "value": "1", "type": "text" },
+										{ "key": "section_id", "value": "1", "type": "text" },
+										{ "key": "title", "value": "Lesson Title", "type": "text" },
+										{ "key": "video", "type": "file", "src": "" },
+										{ "key": "is_free", "value": "false", "type": "text" },
+										{ "key": "order", "value": "1", "type": "text" }
+									]
+								},
+								"url": "{{base_url}}/instructor/videos"
+							}
+						},
+						{
+							"name": "Update Video",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Lesson Title\",\n  \"is_free\": false,\n  \"order\": 1\n}"
+								},
+								"url": "{{base_url}}/instructor/videos/1"
+							}
+						},
+						{
+							"name": "Delete Video",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/videos/1"
+							}
+						},
+						{
+							"name": "Make First Lesson Free",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses/1/make-first-free"
+							}
+						}
+					]
+				},
+				{
+					"name": "Notes",
+					"item": [
+						{
+							"name": "Course Notes",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses/1/notes"
+							}
+						},
+						{
+							"name": "Create Note",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "course_id", "value": "1", "type": "text" },
+										{ "key": "lesson_id", "value": "", "type": "text" },
+										{ "key": "title", "value": "Note Title", "type": "text" },
+										{ "key": "file", "type": "file", "src": "" }
+									]
+								},
+								"url": "{{base_url}}/instructor/notes"
+							}
+						},
+						{
+							"name": "Update Note",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Note Title\"\n}"
+								},
+								"url": "{{base_url}}/instructor/notes/1"
+							}
+						},
+						{
+							"name": "Delete Note",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/notes/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Exams",
+					"item": [
+						{
+							"name": "Course Exams",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses/1/exams"
+							}
+						},
+						{
+							"name": "Create Exam",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"title\": \"Exam Title\",\n  \"duration_minutes\": 60,\n  \"pass_score\": 50\n}"
+								},
+								"url": "{{base_url}}/instructor/exams"
+							}
+						},
+						{
+							"name": "Update Exam",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Exam\",\n  \"duration_minutes\": 90,\n  \"pass_score\": 60\n}"
+								},
+								"url": "{{base_url}}/instructor/exams/1"
+							}
+						},
+						{
+							"name": "Delete Exam",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/exams/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Chat Groups",
+					"item": [
+						{
+							"name": "List Chat Groups",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/chat-groups"
+							}
+						},
+						{
+							"name": "Create Chat Group",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"name\": \"Group Name\"\n}"
+								},
+								"url": "{{base_url}}/instructor/chat-groups"
+							}
+						},
+						{
+							"name": "Update Chat Group",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Updated Group Name\"\n}"
+								},
+								"url": "{{base_url}}/instructor/chat-groups/1"
+							}
+						},
+						{
+							"name": "Delete Chat Group",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/chat-groups/1"
+							}
+						},
+						{
+							"name": "Enrollments Report",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/instructor/courses/1/enrollments-report"
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Dashboard",
+					"item": [
+						{
+							"name": "Stats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/dashboard/stats"
+							}
+						},
+						{
+							"name": "Top Courses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/dashboard/top-courses"
+							}
+						},
+						{
+							"name": "Recent Enrollments",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/dashboard/recent-enrollments"
+							}
+						}
+					]
+				},
+				{
+					"name": "Students",
+					"item": [
+						{
+							"name": "List Students",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/students"
+							}
+						},
+						{
+							"name": "Show Student",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/students/1"
+							}
+						},
+						{
+							"name": "Enroll Student",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"type\": \"full_course\",\n  \"section_id\": null,\n  \"lesson_id\": null,\n  \"free\": false\n}"
+								},
+								"url": "{{base_url}}/admin/students/1/enroll"
+							}
+						},
+						{
+							"name": "Update Student Wallet",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"amount\": 50000,\n  \"type\": \"deposit\"\n}"
+								},
+								"url": "{{base_url}}/admin/students/1/wallet"
+							}
+						},
+						{
+							"name": "Toggle Ban Student",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/students/1/toggle-ban"
+							}
+						}
+					]
+				},
+				{
+					"name": "Instructors",
+					"item": [
+						{
+							"name": "List Instructors",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/instructors"
+							}
+						},
+						{
+							"name": "Create Instructor",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"full_name\": \"Instructor Name\",\n  \"email\": \"instructor@example.com\",\n  \"phone\": \"07501234569\",\n  \"password\": \"password\"\n}"
+								},
+								"url": "{{base_url}}/admin/instructors"
+							}
+						},
+						{
+							"name": "Show Instructor",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/instructors/1"
+							}
+						},
+						{
+							"name": "Update Instructor Permissions",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"permissions\": [\"create video\", \"edit video\", \"create course\"]\n}"
+								},
+								"url": "{{base_url}}/admin/instructors/1/permissions"
+							}
+						},
+						{
+							"name": "Toggle Suspend Instructor",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/instructors/1/toggle-suspend"
+							}
+						},
+						{
+							"name": "Create Course for Instructor",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subject_id\": 1,\n  \"title\": \"Course Title\",\n  \"price\": 50000\n}"
+								},
+								"url": "{{base_url}}/admin/instructors/1/courses"
+							}
+						}
+					]
+				},
+				{
+					"name": "Courses",
+					"item": [
+						{
+							"name": "List Courses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses"
+							}
+						},
+						{
+							"name": "Create Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"instructor_id\": 1,\n  \"subject_id\": 1,\n  \"title\": \"Course Title\",\n  \"description\": \"Description\",\n  \"price\": 50000\n}"
+								},
+								"url": "{{base_url}}/admin/courses"
+							}
+						},
+						{
+							"name": "Show Course",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1"
+							}
+						},
+						{
+							"name": "Update Course",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Title\",\n  \"description\": \"Updated description\",\n  \"price\": 60000,\n  \"is_active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/courses/1"
+							}
+						},
+						{
+							"name": "Course Stats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/stats"
+							}
+						},
+						{
+							"name": "Approve Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/approve"
+							}
+						},
+						{
+							"name": "Reject Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/reject"
+							}
+						},
+						{
+							"name": "Suspend Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/suspend"
+							}
+						},
+						{
+							"name": "Activate Course",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/activate"
+							}
+						},
+						{
+							"name": "Delete Course",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Course Sections",
+					"item": [
+						{
+							"name": "List Course Sections",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/course-sections"
+							}
+						},
+						{
+							"name": "Create Course Section",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"title\": \"الوحدة الأولى\",\n  \"description\": \"وصف الوحدة\",\n  \"order\": 1,\n  \"price\": 10000\n}"
+								},
+								"url": "{{base_url}}/admin/course-sections"
+							}
+						},
+						{
+							"name": "Show Course Section",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/course-sections/1"
+							}
+						},
+						{
+							"name": "Update Course Section",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"الوحدة الأولى (محدّثة)\",\n  \"description\": \"وصف محدّث\",\n  \"order\": 1,\n  \"price\": 15000\n}"
+								},
+								"url": "{{base_url}}/admin/course-sections/1"
+							}
+						},
+						{
+							"name": "Delete Course Section",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/course-sections/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Videos",
+					"item": [
+						{
+							"name": "Upload Video",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "course_id", "value": "1", "type": "text" },
+										{ "key": "section_id", "value": "1", "type": "text" },
+										{ "key": "title", "value": "Lesson Title", "type": "text" },
+										{ "key": "video", "type": "file", "src": "" },
+										{ "key": "is_free", "value": "false", "type": "text" },
+										{ "key": "order", "value": "1", "type": "text" }
+									]
+								},
+								"url": "{{base_url}}/admin/videos"
+							}
+						},
+						{
+							"name": "Update Video",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Lesson Title\",\n  \"is_free\": false,\n  \"order\": 1\n}"
+								},
+								"url": "{{base_url}}/admin/videos/1"
+							}
+						},
+						{
+							"name": "Delete Video",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/videos/1"
+							}
+						},
+						{
+							"name": "Make First Lesson Free",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/make-first-free"
+							}
+						}
+					]
+				},
+				{
+					"name": "Notes",
+					"item": [
+						{
+							"name": "Course Notes",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/notes"
+							}
+						},
+						{
+							"name": "Create Note",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "course_id", "value": "1", "type": "text" },
+										{ "key": "title", "value": "Note Title", "type": "text" },
+										{ "key": "file", "type": "file", "src": "" }
+									]
+								},
+								"url": "{{base_url}}/admin/notes"
+							}
+						},
+						{
+							"name": "Update Note",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Note Title\"\n}"
+								},
+								"url": "{{base_url}}/admin/notes/1"
+							}
+						},
+						{
+							"name": "Delete Note",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/notes/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Exams",
+					"item": [
+						{
+							"name": "Course Exams",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/exams"
+							}
+						},
+						{
+							"name": "Create Exam",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"title\": \"Exam Title\",\n  \"description\": \"Description\",\n  \"duration\": 60,\n  \"questions\": [\n    {\n      \"question\": \"Question text?\",\n      \"type\": \"multiple_choice\",\n      \"options\": [\"A\", \"B\", \"C\"],\n      \"correct_answer\": \"A\",\n      \"points\": 10\n    }\n  ]\n}"
+								},
+								"url": "{{base_url}}/admin/exams"
+							}
+						},
+						{
+							"name": "Update Exam",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Updated Exam\",\n  \"description\": \"Updated\",\n  \"duration\": 90\n}"
+								},
+								"url": "{{base_url}}/admin/exams/1"
+							}
+						},
+						{
+							"name": "Delete Exam",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/exams/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Chat Groups",
+					"item": [
+						{
+							"name": "List Chat Groups",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/chat-groups"
+							}
+						},
+						{
+							"name": "Create Chat Group",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"course_id\": 1,\n  \"name\": \"Group Name\",\n  \"student_ids\": [2, 3]\n}"
+								},
+								"url": "{{base_url}}/admin/chat-groups"
+							}
+						},
+						{
+							"name": "Update Chat Group",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Updated Group Name\"\n}"
+								},
+								"url": "{{base_url}}/admin/chat-groups/1"
+							}
+						},
+						{
+							"name": "Delete Chat Group",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/chat-groups/1"
+							}
+						},
+						{
+							"name": "Enrollments Report",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/courses/1/enrollments-report"
+							}
+						}
+					]
+				},
+				{
+					"name": "Departments",
+					"item": [
+						{
+							"name": "List Departments",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/departments"
+							}
+						},
+						{
+							"name": "Create Department",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"قسم الرياضيات\",\n  \"name_en\": \"Mathematics\",\n  \"description\": \"وصف القسم\",\n  \"icon\": null,\n  \"color\": \"#3498db\",\n  \"order\": 1,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/departments"
+							}
+						},
+						{
+							"name": "Show Department",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/departments/1"
+							}
+						},
+						{
+							"name": "Update Department",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"قسم الرياضيات (محدّث)\",\n  \"name_en\": \"Mathematics Dept\",\n  \"order\": 2,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/departments/1"
+							}
+						},
+						{
+							"name": "Delete Department",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/departments/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Years",
+					"item": [
+						{
+							"name": "List Years",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/years"
+							}
+						},
+						{
+							"name": "Create Year",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"department_id\": 1,\n  \"name\": \"السنة الأولى\",\n  \"order\": 1,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/years"
+							}
+						},
+						{
+							"name": "Show Year",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/years/1"
+							}
+						},
+						{
+							"name": "Update Year",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"department_id\": 1,\n  \"name\": \"السنة الأولى (محدّثة)\",\n  \"order\": 1,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/years/1"
+							}
+						},
+						{
+							"name": "Delete Year",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/years/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Subjects",
+					"item": [
+						{
+							"name": "List Subjects",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/subjects"
+							}
+						},
+						{
+							"name": "Create Subject",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"department_id\": 1,\n  \"year_id\": 1,\n  \"semester_id\": 1,\n  \"name\": \"رياضيات ١\",\n  \"slug\": \"math-1\",\n  \"description\": \"وصف المادة\",\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/subjects"
+							}
+						},
+						{
+							"name": "Show Subject",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/subjects/1"
+							}
+						},
+						{
+							"name": "Update Subject",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"department_id\": 1,\n  \"year_id\": 1,\n  \"semester_id\": 1,\n  \"name\": \"رياضيات ١ (محدّثة)\",\n  \"slug\": \"math-1\",\n  \"description\": \"وصف محدّث\",\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/subjects/1"
+							}
+						},
+						{
+							"name": "Delete Subject",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/subjects/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Semesters",
+					"item": [
+						{
+							"name": "List Semesters",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/semesters"
+							}
+						},
+						{
+							"name": "Create Semester",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"year_id\": 1,\n  \"name\": \"الفصل الأول\",\n  \"order\": 1,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/semesters"
+							}
+						},
+						{
+							"name": "Show Semester",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/semesters/1"
+							}
+						},
+						{
+							"name": "Update Semester",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" },
+									{ "key": "Content-Type", "value": "application/json" }
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"year_id\": 1,\n  \"name\": \"الفصل الأول (محدّث)\",\n  \"order\": 1,\n  \"active\": true\n}"
+								},
+								"url": "{{base_url}}/admin/semesters/1"
+							}
+						},
+						{
+							"name": "Delete Semester",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/semesters/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Student View",
+					"item": [
+						{
+							"name": "Home (Banners + Departments)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/student-view/home"
+							}
+						},
+						{
+							"name": "Departments",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/student-view/departments"
+							}
+						},
+						{
+							"name": "Courses by Subject",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/student-view/courses/subject/1"
+							}
+						},
+						{
+							"name": "Search Courses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/student-view/courses"
+							}
+						},
+						{
+							"name": "Show Course",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/student-view/courses/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Banners",
+					"item": [
+						{
+							"name": "List Banners",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/banners"
+							}
+						},
+						{
+							"name": "Create Banner",
+							"request": {
+								"method": "POST",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "title", "value": "Banner Title", "type": "text" },
+										{ "key": "image", "type": "file", "src": "" },
+										{ "key": "link_type", "value": "none", "type": "text" },
+										{ "key": "link_id", "value": "", "type": "text" },
+										{ "key": "link_url", "value": "", "type": "text" },
+										{ "key": "order", "value": "1", "type": "text" }
+									]
+								},
+								"url": "{{base_url}}/admin/banners"
+							}
+						},
+						{
+							"name": "Update Banner",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{ "key": "title", "value": "Updated Banner", "type": "text" },
+										{ "key": "image", "type": "file", "src": "" },
+										{ "key": "order", "value": "1", "type": "text" }
+									]
+								},
+								"url": "{{base_url}}/admin/banners/1"
+							}
+						},
+						{
+							"name": "Delete Banner",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/banners/1"
+							}
+						}
+					]
+				},
+				{
+					"name": "Reports",
+					"item": [
+						{
+							"name": "Revenue Report",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/reports/revenue"
+							}
+						},
+						{
+							"name": "Course Performance",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/reports/course-performance"
+							}
+						},
+						{
+							"name": "Instructor Performance",
+							"request": {
+								"method": "GET",
+								"header": [
+									{ "key": "Accept", "value": "application/json" },
+									{ "key": "Authorization", "value": "Bearer {{token}}" }
+								],
+								"url": "{{base_url}}/admin/reports/instructor-performance"
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

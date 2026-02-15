@@ -13,23 +13,28 @@ class Course extends Model
         'subject_id',
         'instructor_id',
         'title',
-        'slug',
         'description',
+        'image',
         'price',
-        'is_active',
-        'is_approved',
+        'allow_section_purchase',
+        'allow_lesson_purchase',
+        'free_first_lesson',
+        'status',
+        'active',
         'students_count',
-        'starts_at',
-        'ends_at',
+        'rating',
+        'reviews_count',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
-        'is_active' => 'boolean',
-        'is_approved' => 'boolean',
+        'allow_section_purchase' => 'boolean',
+        'allow_lesson_purchase' => 'boolean',
+        'free_first_lesson' => 'boolean',
+        'active' => 'boolean',
         'students_count' => 'integer',
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
+        'rating' => 'decimal:2',
+        'reviews_count' => 'integer',
     ];
 
     public function subject()
@@ -42,6 +47,12 @@ class Course extends Model
         return $this->belongsTo(User::class, 'instructor_id');
     }
 
+    /** الكورسات الظاهرة للطالب (موافق عليها من الأدمن). */
+    public function scopeApprovedForStudents($query)
+    {
+        return $query->where('status', 'published')->where('active', true);
+    }
+
     public function sections()
     {
         return $this->hasMany(CourseSection::class);
@@ -51,5 +62,19 @@ class Course extends Model
     {
         return $this->hasMany(Lesson::class);
     }
-}
 
+    public function enrollments()
+    {
+        return $this->hasMany(Enrollment::class);
+    }
+
+    public function notes()
+    {
+        return $this->hasMany(Note::class);
+    }
+
+    public function exams()
+    {
+        return $this->hasMany(Exam::class);
+    }
+}

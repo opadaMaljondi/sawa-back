@@ -56,6 +56,13 @@ class EnrollmentController extends Controller
 
         return DB::transaction(function () use ($request) {
             $course = Course::findOrFail($request->course_id);
+
+            if (!$course->active || $course->status !== 'published') {
+                return response()->json([
+                    'message' => 'This course is not available for enrollment.',
+                ], 422);
+            }
+
             $student = auth()->user();
 
             // حساب السعر
@@ -131,7 +138,7 @@ class EnrollmentController extends Controller
 
             // تحديث عدد الطلاب
             if ($request->type === 'full_course') {
-                $course->incrementStudentsCount();
+                $course->increment('students_count');
             }
 
             return response()->json([

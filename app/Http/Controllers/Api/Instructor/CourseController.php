@@ -31,6 +31,7 @@ class CourseController extends Controller
             'subject_id' => 'required|exists:subjects,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'image' => 'nullable|string|max:500',
             'price' => 'required|numeric|min:0',
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
@@ -48,11 +49,12 @@ class CourseController extends Controller
             'instructor_id' => auth()->id(),
             'title' => $request->title,
             'description' => $request->description,
+            'image' => $request->image,
             'price' => $request->price,
-            'allow_section_purchase' => $request->allow_section_purchase ?? false,
-            'allow_lesson_purchase' => $request->allow_lesson_purchase ?? false,
-            'free_first_lesson' => $request->free_first_lesson ?? false,
-            'status' => 'pending', // يحتاج موافقة الأدمن
+            'allow_section_purchase' => $request->boolean('allow_section_purchase', false),
+            'allow_lesson_purchase' => $request->boolean('allow_lesson_purchase', false),
+            'free_first_lesson' => $request->boolean('free_first_lesson', false),
+            'status' => 'pending',
             'active' => false,
         ]);
 
@@ -78,10 +80,17 @@ class CourseController extends Controller
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
+            'image' => 'nullable|string|max:500',
             'price' => 'sometimes|numeric|min:0',
+            'allow_section_purchase' => 'boolean',
+            'allow_lesson_purchase' => 'boolean',
+            'free_first_lesson' => 'boolean',
         ]);
 
-        $course->update($request->only(['title', 'description', 'price']));
+        $course->update($request->only([
+            'title', 'description', 'image', 'price',
+            'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
+        ]));
 
         return response()->json([
             'message' => 'Course updated successfully',

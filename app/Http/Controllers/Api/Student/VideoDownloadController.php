@@ -26,6 +26,10 @@ class VideoDownloadController extends Controller
         $lesson = Lesson::findOrFail($lessonId);
         $student = auth()->user();
 
+        if ($lesson->approval_status !== 'approved' || !$lesson->active) {
+            return response()->json(['message' => 'Lesson not available.'], 404);
+        }
+
         // التحقق من الاشتراك
         if (!$student->hasAccessToLesson($lessonId)) {
             return response()->json(['message' => 'Access denied'], 403);
@@ -51,12 +55,15 @@ class VideoDownloadController extends Controller
             [
                 'student_id' => $student->id,
                 'lesson_id' => $lessonId,
+                'device_id' => null,
             ],
             [
                 'encrypted_path' => $encryptedPath,
                 'token' => $encryptionData['token'],
-                'decryption_key' => $encryptionData['decryption_key'],
+                'encryption_key' => $encryptionData['decryption_key'],
+                'quality' => '360p',
                 'file_size' => $encryptionData['file_size'],
+                'status' => 'completed',
                 'downloaded_at' => now(),
             ]
         );
@@ -91,6 +98,10 @@ class VideoDownloadController extends Controller
 
         $lesson = $downloaded->lesson;
 
+        if ($lesson->approval_status !== 'approved' || !$lesson->active) {
+            return response()->json(['message' => 'Lesson not available.'], 404);
+        }
+
         // التحقق من الاشتراك
         if (!auth()->user()->hasAccessToLesson($lesson->id)) {
             return response()->json(['message' => 'Access denied'], 403);
@@ -108,10 +119,10 @@ class VideoDownloadController extends Controller
 
         // فك التشفير وإرسال الفيديو
         $tempOutput = storage_path('app/videos/temp/' . uniqid() . '.mp4');
-        
+
         if ($this->encryptionService->decryptVideo(
             $downloaded->encrypted_path,
-            $downloaded->decryption_key,
+            $downloaded->encryption_key,
             $tempOutput
         )) {
             return response()->file($tempOutput);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\YouTubeAuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,3 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// YouTube OAuth – لتفعيل رفع الفيديو إلى YouTube (مرة واحدة)
+Route::get('/youtube/auth', [YouTubeAuthController::class, 'redirectToGoogle'])->name('youtube.auth');
+Route::get('/youtube/callback', [YouTubeAuthController::class, 'handleCallback'])->name('youtube.callback');

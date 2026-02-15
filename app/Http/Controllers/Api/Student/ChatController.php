@@ -31,7 +31,13 @@ class ChatController extends Controller
     {
         $chat = Chat::whereHas('participants', function ($query) {
             $query->where('user_id', auth()->id());
-        })->findOrFail($chatId);
+        })->find($chatId);
+
+        if (!$chat) {
+            return response()->json([
+                'message' => 'Chat not found or you do not have access to it.',
+            ], 404);
+        }
 
         $messages = Message::where('chat_id', $chatId)
             ->with('sender')
@@ -53,16 +59,25 @@ class ChatController extends Controller
 
         $chat = Chat::whereHas('participants', function ($query) {
             $query->where('user_id', auth()->id());
-        })->findOrFail($chatId);
+        })->find($chatId);
+
+        if (!$chat) {
+            return response()->json([
+                'message' => 'Chat not found or you do not have access to it.',
+            ], 404);
+        }
 
         $message = Message::create([
             'chat_id' => $chatId,
             'sender_id' => auth()->id(),
-            'message' => $request->message,
+            'content' => $request->message,
             'type' => $request->type ?? 'text',
+            'sent_at' => now(),
         ]);
 
-        $chat->touch(); // تحديث updated_at
+        $chat->touch();
+
+        event(new \App\Events\MessageSent($message));
 
         return response()->json([
             'message' => $message->load('sender'),

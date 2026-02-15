@@ -43,17 +43,23 @@ class CourseController extends Controller
     }
 
     /**
-     * Get courses by subject
+     * Get courses by subject (للطالب: فقط الكورسات الموافق عليها والدروس الموافق عليها).
      */
     public function getCoursesBySubject(Request $request, $subjectId)
     {
-        $subject = Subject::with(['courses.instructor', 'courses.sections.lessons'])
-            ->findOrFail($subjectId);
+        $subject = Subject::findOrFail($subjectId);
 
-        $courses = Course::where('subject_id', $subjectId)
-            ->where('active', true)
-            ->where('status', 'published')
-            ->with(['instructor', 'sections.lessons'])
+        $courses = Course::approvedForStudents()
+            ->where('subject_id', $subjectId)
+            ->with([
+                'instructor',
+                'sections' => function ($q) {
+                    $q->orderBy('order');
+                },
+                'sections.lessons' => function ($q) {
+                    $q->approvedForStudents()->orderBy('order');
+                },
+            ])
             ->get();
 
         return response()->json([
@@ -63,17 +69,28 @@ class CourseController extends Controller
     }
 
     /**
-     * Get course details
+     * Get course details (للطالب: فقط إن كان الكورس موافقاً عليه، والدروس الموافق عليها فقط).
      */
     public function show($courseId)
     {
-        $course = Course::with([
-            'instructor',
-            'sections.lessons',
-            'subject.department',
-            'subject.year',
-            'subject.semester',
-        ])->findOrFail($courseId);
+        $course = Course::approvedForStudents()
+            ->with([
+                'instructor',
+                'subject.department',
+                'subject.year',
+                'subject.semester',
+                'sections' => function ($q) {
+                    $q->orderBy('order');
+                },
+                'sections.lessons' => function ($q) {
+                    $q->approvedForStudents()->orderBy('order');
+                },
+            ])
+            ->find($courseId);
+
+        if (!$course) {
+            return response()->json(['message' => 'Course not found or not available.'], 404);
+        }
 
         $isEnrolled = auth()->user()->hasAccessToCourse($courseId);
 
@@ -85,12 +102,11 @@ class CourseController extends Controller
     }
 
     /**
-     * Search courses
+     * Search courses (للطالب: فقط الكورسات الموافق عليها).
      */
     public function search(Request $request)
     {
-        $query = Course::where('active', true)
-            ->where('status', 'published')
+        $query = Course::approvedForStudents()
             ->with(['instructor', 'subject']);
 
         if ($request->has('keyword')) {
