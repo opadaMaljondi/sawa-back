@@ -148,7 +148,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Students
     Route::get('students', [AdminStudentController::class, 'index']);
+    Route::post('students', [AdminStudentController::class, 'store']);
     Route::get('students/{studentId}', [AdminStudentController::class, 'show']);
+    Route::put('students/{studentId}', [AdminStudentController::class, 'update']);
     Route::post('students/{studentId}/enroll', [AdminStudentController::class, 'enrollStudent']);
     Route::post('students/{studentId}/wallet', [AdminStudentController::class, 'updateWallet']);
     Route::post('students/{studentId}/toggle-ban', [AdminStudentController::class, 'toggleBan']);

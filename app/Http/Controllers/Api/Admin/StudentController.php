@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Enrollment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class StudentController extends Controller
 {
@@ -37,6 +38,38 @@ class StudentController extends Controller
     }
 
     /**
+     * Create new student (by admin)
+     */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'full_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'phone' => 'required|string|unique:users,phone',
+            'password' => 'required|string|min:6',
+            'active' => 'boolean',
+        ]);
+
+        $student = User::create([
+            'full_name' => $data['full_name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'password' => Hash::make($data['password']),
+            'type' => 'student',
+            'active' => $request->boolean('active', true),
+        ]);
+
+        if (method_exists($student, 'assignRole')) {
+            $student->assignRole('student');
+        }
+
+        return response()->json([
+            'message' => 'Student created successfully',
+            'student' => $student,
+        ], 201);
+    }
+
+    /**
      * Get student details
      */
     public function show($studentId)
@@ -51,6 +84,35 @@ class StudentController extends Controller
             ->findOrFail($studentId);
 
         return response()->json($student);
+    }
+
+    /**
+     * Update student basic info
+     */
+    public function update(Request $request, $studentId)
+    {
+        $student = User::where('type', 'student')->findOrFail($studentId);
+
+        $data = $request->validate([
+            'full_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $student->id,
+            'phone' => 'sometimes|string|unique:users,phone,' . $student->id,
+            'password' => 'nullable|string|min:6',
+            'active' => 'sometimes|boolean',
+        ]);
+
+        if (! empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        $student->update($data);
+
+        return response()->json([
+            'message' => 'Student updated successfully',
+            'student' => $student->fresh(),
+        ]);
     }
 
     /**

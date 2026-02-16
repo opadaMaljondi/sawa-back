@@ -1,48 +1,101 @@
-# لوحة تحكم ساوى – Admin Dashboard
+# Admin Dashboard
 
-واجهة إدارة أمامية بـ **React** و **Tailwind CSS** تتصل بـ Laravel API.
+A comprehensive React.js admin dashboard for educational platform management with full Arabic/English support.
 
-## المتطلبات
+## Features
 
-- Node.js 18+
-- تشغيل الـ Backend (Laravel) على `http://localhost:8000`
+- 🌐 **Bilingual Support**: Full Arabic and English translations with RTL/LTR layout
+- 🎨 **Modern UI**: Beautiful design with light/dark theme support
+- 📱 **Responsive**: Works seamlessly on desktop, tablet, and mobile devices
+- ⚡ **Fast**: Built with Vite for optimal performance
+- 🎯 **Feature-Rich**: Complete modules for managing students, teachers, courses, and more
 
-## التثبيت والتشغيل
+## Tech Stack
+
+- **React 18** - UI library
+- **Vite** - Build tool
+- **React Router v6** - Routing
+- **i18next** - Internationalization
+- **Axios** - HTTP client
+- **Lucide React** - Beautiful icons
+- **Vanilla CSS** - Styling with CSS variables
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16+ and npm
+
+### Installation
 
 ```bash
-cd admin-dashboard
+# Install dependencies
 npm install
+
+# Start development server
 npm run dev
-```
 
-ثم افتح المتصفح على: **http://localhost:3000**
-
-## تسجيل الدخول
-
-- استخدم حساب **أدمن** من قاعدة البيانات (نوع المستخدم `admin`).
-- الـ API: `POST /api/auth/login` بالحقول `login` (بريد أو هاتف) و `password`.
-
-## المتغيرات البيئية
-
-أنشئ ملف `.env` في مجلد `admin-dashboard` (اختياري):
-
-```env
-# إذا كان الـ API على عنوان آخر
-VITE_API_URL=http://localhost:8000/api
-```
-
-بدون هذا المتغير، الطلبات ستذهب إلى `/api` وسيعمل الـ proxy في Vite إلى `http://localhost:8000`.
-
-## البناء للإنتاج
-
-```bash
+# Build for production
 npm run build
+
+# Preview production build
+npm run preview
 ```
 
-الملفات الناتجة في `dist/` يمكن رفعها على أي خادم ثابت أو داخل مجلد `public` في Laravel.
+## Project Structure
 
-## الصفحات الحالية
+```
+src/
+├── assets/
+│   └── styles/          # Global styles and design system
+├── components/
+│   ├── common/          # Reusable components (Button, Card, Input, etc.)
+│   └── layout/          # Layout components (Sidebar, Header, MainLayout)
+├── contexts/            # React contexts (Auth, Theme, Language)
+├── locales/             # Translation files (ar.json, en.json)
+├── pages/               # Page components
+│   ├── students/
+│   ├── teachers/
+│   ├── courses/
+│   └── ...
+├── services/            # API service layer
+└── utils/               # Utility functions
+```
 
-- **لوحة التحكم**: إحصائيات، أفضل الكورسات، آخر التسجيلات.
-- **تسجيل الدخول**: للأسمن فقط.
-- باقي الروابط (طلاب، معلمون، كورسات، أقسام، إشعارات): صفحات placeholder جاهزة للتوسيع.
+## Modules
+
+- **Dashboard**: Overview with statistics and recent activities
+- **Students**: Student management with CRUD operations
+- **Teachers**: Teacher management and course assignments
+- **Courses**: Course management with videos and sections
+- **Permissions**: Role-based access control
+- **Subscriptions**: Subscription plans and management
+- **Academic Structure**: Departments, years, semesters, and subjects
+- **Settings**: System configuration
+
+## API Integration
+
+The application is structured with a dedicated API service layer in `src/services/api.js`. Update the `baseURL` to point to your backend API:
+
+```javascript
+const api = axios.create({
+  baseURL: 'YOUR_API_URL_HERE',
+  // ...
+});
+```
+
+## Customization
+
+### Theme
+
+Customize colors and design tokens in `src/assets/styles/variables.css`
+
+### Translations
+
+Add or modify translations in:
+- `src/locales/ar.json` (Arabic)
+- `src/locales/en.json` (English)
+
+## License
+
+MIT

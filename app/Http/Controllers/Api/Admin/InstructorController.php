@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 
 class InstructorController extends Controller
 {
@@ -64,7 +65,7 @@ class InstructorController extends Controller
     public function show($instructorId)
     {
         $instructor = User::where('type', 'instructor')
-            ->with(['courses.subject', 'courses.sections.lessons'])
+            ->with(['courses.subject', 'courses.sections.lessons', 'permissions'])
             ->findOrFail($instructorId);
 
         return response()->json($instructor);
@@ -77,13 +78,35 @@ class InstructorController extends Controller
     {
         $instructor = User::where('type', 'instructor')->findOrFail($instructorId);
 
-        $request->validate([
+        $data = $request->validate([
             'permissions' => 'required|array',
             'permissions.*' => 'string',
         ]);
 
-        // تحديث الصلاحيات
-        $instructor->syncPermissions($request->permissions);
+        // إنشاء / تحديث صلاحيات على مستوى المستخدم مباشرة (ليس على مستوى الدور)
+        // نستخدم حارس web دائماً لصلاحيات لوحة التحكم
+        $guard = 'web';
+
+        $permissionNames = [];
+        foreach ($data['permissions'] as $name) {
+            if (! $name) {
+                continue;
+            }
+
+            Permission::firstOrCreate(
+                ['name' => $name, 'guard_name' => $guard],
+                []
+            );
+
+            $permissionNames[] = $name;
+        }
+
+        // جلب كائنات Permission وربطها بالمستخدم مباشرة (model_has_permissions)
+        $permissions = Permission::whereIn('name', $permissionNames)
+            ->where('guard_name', $guard)
+            ->get();
+
+        $instructor->syncPermissions($permissions);
 
         return response()->json([
             'message' => 'Permissions updated successfully',

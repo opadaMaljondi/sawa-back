@@ -1,2 +1,0 @@
-# Base URL for API (optional – dev uses Vite proxy to http://localhost:8000)
-# VITE_API_URL=http://localhost:8000/api
