@@ -157,4 +157,17 @@ class InstructorController extends Controller
             'course' => $course,
         ], 201);
     }
+
+    /**
+     * Delete instructor
+     */
+    public function destroy($instructorId)
+    {
+        $instructor = User::where('type', 'instructor')->findOrFail($instructorId);
+        $instructor->delete();
+
+        return response()->json([
+            'message' => 'Instructor deleted successfully',
+        ]);
+    }
 }

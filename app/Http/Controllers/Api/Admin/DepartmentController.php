@@ -36,7 +36,7 @@ class DepartmentController extends Controller
      */
     public function show($id)
     {
-        $department = Department::with(['years.semesters', 'years.subjects'])->findOrFail($id);
+        $department = Department::with(['years.semesters.subjects'])->findOrFail($id);
         return response()->json($department);
     }
 
@@ -49,17 +49,22 @@ class DepartmentController extends Controller
             'name' => 'required|string|max:255',
             'name_en' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'icon' => 'nullable|string|max:255',
+            'icon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'color' => 'nullable|string|max:20',
             'order' => 'nullable|integer|min:0',
-            'active' => 'boolean',
+            'active' => 'sometimes|boolean',
         ]);
+
+        $iconPath = null;
+        if ($request->hasFile('icon')) {
+            $iconPath = $request->file('icon')->store('departments', 'public');
+        }
 
         $department = Department::create([
             'name' => $request->name,
             'name_en' => $request->name_en ?? $request->name,
             'description' => $request->description,
-            'icon' => $request->icon,
+            'icon' => $iconPath,
             'color' => $request->color ?? '#000000',
             'order' => $request->order ?? 0,
             'active' => $request->boolean('active', true),
@@ -82,15 +87,29 @@ class DepartmentController extends Controller
             'name' => 'sometimes|string|max:255',
             'name_en' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'icon' => 'nullable|string|max:255',
+            'icon' => 'nullable|sometimes', // Can be file or existing path
             'color' => 'nullable|string|max:20',
             'order' => 'nullable|integer|min:0',
-            'active' => 'boolean',
+            'active' => 'sometimes',
         ]);
 
-        $department->update($request->only([
-            'name', 'name_en', 'description', 'icon', 'color', 'order', 'active',
-        ]));
+        $data = $request->only([
+            'name', 'name_en', 'description', 'color', 'order'
+        ]);
+
+        if ($request->has('active')) {
+            $data['active'] = $request->boolean('active');
+        }
+
+        if ($request->hasFile('icon')) {
+            // Delete old icon if exists
+            if ($department->icon && \Storage::disk('public')->exists($department->icon)) {
+                \Storage::disk('public')->delete($department->icon);
+            }
+            $data['icon'] = $request->file('icon')->store('departments', 'public');
+        }
+
+        $department->update($data);
 
         return response()->json([
             'message' => 'Department updated successfully',

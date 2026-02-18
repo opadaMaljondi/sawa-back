@@ -14,10 +14,23 @@ export const ThemeProvider = ({ children }) => {
     const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
 
     useEffect(() => {
-        // Apply theme to document
-        document.documentElement.setAttribute('data-theme', theme);
+        const root = document.documentElement;
 
-        // Save to localStorage
+        if (theme === 'system') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.setAttribute('data-theme', systemTheme);
+
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const handleChange = () => {
+                root.setAttribute('data-theme', mediaQuery.matches ? 'dark' : 'light');
+            };
+
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        } else {
+            root.setAttribute('data-theme', theme);
+        }
+
         localStorage.setItem('theme', theme);
     }, [theme]);
 

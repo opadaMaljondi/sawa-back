@@ -4,10 +4,51 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
+use App\Models\UserNotification;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    /**
+     * عرض قائمة الإشعارات الواردة للآدمن
+     */
+    public function index(Request $request)
+    {
+        $notifications = UserNotification::where('user_id', $request->user()->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json($notifications);
+    }
+
+    /**
+     * جلب عدد الإشعارات غير المقروءة
+     */
+    public function getUnreadCount(Request $request)
+    {
+        $count = UserNotification::where('user_id', $request->user()->id)
+            ->where('read', false)
+            ->count();
+
+        return response()->json(['unread_count' => $count]);
+    }
+
+    /**
+     * تحديد إشعار كمقروء
+     */
+    public function markAsRead(Request $request, $id)
+    {
+        $notification = UserNotification::where('user_id', $request->user()->id)
+            ->findOrFail($id);
+
+        $notification->update([
+            'read' => true,
+            'read_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Notification marked as read']);
+    }
+
     /**
      * إرسال إشعار حسب النوع:
      * ١ عام (general): كل المستخدمين – مثل التحديثات والتحذيرات
@@ -18,11 +59,12 @@ class NotificationController extends Controller
     public function send(Request $request, NotificationService $notificationService)
     {
         $request->validate([
-            'scope' => 'required|in:general,department,course',
+            'scope' => 'required|in:general,department,course,user',
             'title' => 'required|string|max:255',
             'message' => 'required|string',
             'department_id' => 'required_if:scope,department|exists:departments,id',
             'course_id' => 'required_if:scope,course|exists:courses,id',
+            'user_id' => 'required_if:scope,user|exists:users,id',
             'data' => 'nullable|array',
         ]);
 
@@ -41,6 +83,12 @@ class NotificationController extends Controller
             ),
             'course' => $notificationService->sendToCourse(
                 (int) $request->course_id,
+                $title,
+                $message,
+                $data
+            ),
+            'user' => $notificationService->sendToUser(
+                (int) $request->user_id,
                 $title,
                 $message,
                 $data

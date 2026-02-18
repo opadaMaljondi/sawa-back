@@ -10,6 +10,7 @@ import StudentDetails from './pages/students/StudentDetails';
 import StudentForm from './pages/students/StudentForm';
 import TeachersList from './pages/teachers/TeachersList';
 import TeacherDetails from './pages/teachers/TeacherDetails';
+import TeacherForm from './pages/teachers/TeacherForm';
 import CoursesList from './pages/courses/CoursesList';
 import CourseDetails from './pages/courses/CourseDetails';
 import CourseForm from './pages/courses/CourseForm';
@@ -18,6 +19,12 @@ import DepartmentsPage from './pages/academic/Departments';
 import YearsPage from './pages/academic/Years';
 import SemestersPage from './pages/academic/Semesters';
 import SubjectsPage from './pages/academic/Subjects';
+import SubscriptionsList from './pages/subscriptions/SubscriptionsList';
+import SettingsPage from './pages/settings/SettingsPage';
+import ProfilePage from './pages/profile/ProfilePage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
+import BannersPage from './pages/banners/Banners';
+import RolesAndPermissions from './pages/permissions/RolesAndPermissions';
 import Login from './pages/auth/Login';
 import './assets/styles/index.css';
 
@@ -46,50 +53,55 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-    return (
-        <BrowserRouter>
-            <ThemeProvider>
-                <LanguageProvider>
-                    <AuthProvider>
-                        <Routes>
-                          <Route path="/login" element={<Login />} />
-                          <Route
-                            path="/"
-                            element={
-                              <ProtectedRoute>
-                                <MainLayout />
-                              </ProtectedRoute>
-                            }
-                          >
-                            <Route index element={<Dashboard />} />
-                            <Route path="students" element={<StudentsList />} />
-                            <Route path="students/new" element={<StudentForm />} />
-                            <Route path="students/:id" element={<StudentDetails />} />
-                            <Route path="students/:id/edit" element={<StudentForm />} />
-                            <Route path="teachers" element={<TeachersList />} />
-                            <Route path="teachers/:id" element={<TeacherDetails />} />
-                            <Route path="courses" element={<CoursesList />} />
-                            <Route path="courses/new" element={<CourseForm />} />
-                            <Route path="courses/:id" element={<CourseDetails />} />
-                            <Route path="courses/:id/edit" element={<CourseForm />} />
-                            <Route path="courses/:courseId/lessons/:lessonId" element={<VideoPlayer />} />
+  return (
+    <BrowserRouter>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="students" element={<StudentsList />} />
+                <Route path="students/new" element={<StudentForm />} />
+                <Route path="students/:id" element={<StudentDetails />} />
+                <Route path="students/:id/edit" element={<StudentForm />} />
+                <Route path="teachers" element={<TeachersList />} />
+                <Route path="teachers/new" element={<TeacherForm />} />
+                <Route path="teachers/:id" element={<TeacherDetails />} />
+                <Route path="teachers/:id/edit" element={<TeacherForm />} />
+                <Route path="courses" element={<CoursesList />} />
+                <Route path="courses/new" element={<CourseForm />} />
+                <Route path="courses/:id" element={<CourseDetails />} />
+                <Route path="courses/:id/edit" element={<CourseForm />} />
+                <Route path="courses/:courseId/lessons/:lessonId" element={<VideoPlayer />} />
 
-                            {/* Academic structure */}
-                            <Route path="permissions" element={<div className="p-4"><h1>الصلاحيات - قيد التطوير</h1></div>} />
-                            <Route path="subscriptions" element={<div className="p-4"><h1>الاشتراكات - قيد التطوير</h1></div>} />
-                            <Route path="academic/departments" element={<DepartmentsPage />} />
-                            <Route path="academic/years" element={<YearsPage />} />
-                            <Route path="academic/semesters" element={<SemestersPage />} />
-                            <Route path="academic/subjects" element={<SubjectsPage />} />
-                            <Route path="settings" element={<div className="p-4"><h1>الإعدادات - قيد التطوير</h1></div>} />
-                          </Route>
-                          <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                    </AuthProvider>
-                </LanguageProvider>
-            </ThemeProvider>
-        </BrowserRouter>
-    );
+                {/* Academic structure */}
+                <Route path="permissions" element={<RolesAndPermissions />} />
+                <Route path="subscriptions" element={<SubscriptionsList />} />
+                <Route path="academic/departments" element={<DepartmentsPage />} />
+                <Route path="academic/years" element={<YearsPage />} />
+                <Route path="academic/semesters" element={<SemestersPage />} />
+                <Route path="academic/subjects" element={<SubjectsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="banners" element={<BannersPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
 }
 
 export default App;

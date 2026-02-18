@@ -58,6 +58,18 @@ class CourseController extends Controller
             'active' => false,
         ]);
 
+        // إرسال إشعار للآدمن
+        $notificationService = app(\App\Services\NotificationService::class);
+        $adminIds = \App\Models\User::where('type', 'admin')->pluck('id')->toArray();
+        foreach ($adminIds as $adminId) {
+            $notificationService->sendToUser(
+                $adminId,
+                'كورس جديد ينتظر الموافقة',
+                "قام الأستاذ {$instructor->full_name} بإنشاء كورس جديد بعنوان: {$course->title}",
+                ['course_id' => $course->id, 'type' => 'course_approval']
+            );
+        }
+
         return response()->json([
             'message' => 'Course created successfully. Waiting for admin approval.',
             'course' => $course,

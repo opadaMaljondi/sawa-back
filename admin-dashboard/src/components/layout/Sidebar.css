@@ -44,6 +44,7 @@
     font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     white-space: nowrap;
+    font-family: inherit;
 }
 
 .sidebar-nav {
@@ -72,6 +73,7 @@
     background: transparent;
     width: 100%;
     text-align: start;
+    font-family: inherit;
 }
 
 .sidebar-link:hover,

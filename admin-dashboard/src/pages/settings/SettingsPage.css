@@ -1,0 +1,190 @@
+.settings-container {
+    padding: 0;
+    overflow: hidden;
+}
+
+.settings-layout {
+    display: flex;
+    min-height: 500px;
+}
+
+.settings-sidebar {
+    width: 240px;
+    background: var(--bg-secondary);
+    border-inline-end: 1px solid var(--border-primary);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.settings-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-align: start;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.settings-tab-btn:hover {
+    background: var(--bg-hover);
+    color: var(--color-primary-600);
+}
+
+.settings-tab-btn.active {
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+}
+
+[data-theme="dark"] .settings-tab-btn.active {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--color-primary-400);
+}
+
+.settings-content {
+    flex: 1;
+    padding: 2rem;
+    background-color: var(--bg-primary);
+}
+
+.settings-form-grid {
+    display: grid;
+    gap: 1.5rem;
+    max-width: 600px;
+}
+
+.form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-item label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.flex-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+}
+
+.settings-textarea {
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-primary);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 8px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.settings-textarea:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.settings-label-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.theme-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.theme-option-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.theme-option-btn span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.theme-option-btn:hover {
+    border-color: var(--color-primary-400);
+    background: var(--bg-hover);
+}
+
+.theme-option-btn.active {
+    border-color: var(--color-primary-600);
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+    box-shadow: 0 0 0 1px var(--color-primary-600);
+}
+
+[data-theme="dark"] .theme-option-btn.active {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--color-primary-400);
+}
+
+.settings-footer {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settings-msg {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.settings-msg.success {
+    background: var(--color-success-50);
+    color: var(--color-success-700);
+    border: 1px solid var(--color-success-100);
+}
+
+.settings-msg.error {
+    background: var(--color-error-50);
+    color: var(--color-error-700);
+    border: 1px solid var(--color-error-100);
+}
+
+/* RTL Adjustments */
+[dir="rtl"] .settings-sidebar {
+    border-inline-end: 1px solid var(--border-primary);
+}
+
+[dir="rtl"] .settings-tab-btn {
+    text-align: right;
+}

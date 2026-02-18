@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, UserMinus } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -29,6 +29,27 @@ const TeachersList = () => {
             setTeachers([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleToggleSuspend = async (teacherId) => {
+        try {
+            await teachersAPI.toggleSuspend(teacherId);
+            await fetchTeachers(pagination.current_page || 1);
+        } catch (e) {
+            console.error(e);
+            alert('فشل تغيير حالة الأستاذ');
+        }
+    };
+
+    const handleDelete = async (teacherId) => {
+        if (!window.confirm(t('messages.confirmDelete'))) return;
+        try {
+            await teachersAPI.delete(teacherId);
+            await fetchTeachers(pagination.current_page || 1);
+        } catch (e) {
+            console.error(e);
+            alert(e.response?.data?.message || 'فشل حذف الأستاذ');
         }
     };
 
@@ -106,10 +127,19 @@ const TeachersList = () => {
                                                     >
                                                         <Eye size={16} />
                                                     </button>
-                                                    <button className="action-btn action-btn-edit" title={t('common.edit')}>
-                                                        <Edit size={16} />
+                                                    <button
+                                                        className="action-btn action-btn-edit"
+                                                        title={teacher.active ? 'إيقاف الأستاذ' : 'تفعيل الأستاذ'}
+                                                        style={{ color: teacher.active ? 'var(--color-warning-600)' : 'var(--color-success-600)' }}
+                                                        onClick={() => handleToggleSuspend(teacher.id)}
+                                                    >
+                                                        <UserMinus size={16} />
                                                     </button>
-                                                    <button className="action-btn action-btn-delete" title={t('common.delete')}>
+                                                    <button
+                                                        className="action-btn action-btn-delete"
+                                                        title={t('common.delete')}
+                                                        onClick={() => handleDelete(teacher.id)}
+                                                    >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>

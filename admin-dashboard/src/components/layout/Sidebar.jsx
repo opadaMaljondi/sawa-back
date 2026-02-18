@@ -12,6 +12,8 @@ import {
     Calendar,
     BookMarked,
     Settings,
+    Bell,
+    Image as ImageIcon,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -27,6 +29,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
         { path: '/courses', icon: BookOpen, label: t('nav.courses') },
         { path: '/permissions', icon: Shield, label: t('nav.permissions') },
         { path: '/subscriptions', icon: CreditCard, label: t('nav.subscriptions') },
+        { path: '/banners', icon: ImageIcon, label: t('banners.title') || 'البانرات' },
         {
             label: t('nav.academic'),
             icon: Building2,
@@ -37,6 +40,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 { path: '/academic/subjects', icon: BookMarked, label: t('nav.subjects') }
             ]
         },
+        { path: '/notifications', icon: Bell, label: t('common.notifications') },
         { path: '/settings', icon: Settings, label: t('nav.settings') }
     ];
 

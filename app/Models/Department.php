@@ -23,6 +23,17 @@ class Department extends Model
         'active' => 'boolean',
     ];
 
+    protected $appends = ['icon_url'];
+
+    public function getIconUrlAttribute()
+    {
+        if ($this->icon && !filter_var($this->icon, FILTER_VALIDATE_URL)) {
+            $storageUrl = rtrim(config('app.url'), '/') . '/storage/';
+            return $storageUrl . $this->icon;
+        }
+        return $this->icon;
+    }
+
     public function years()
     {
         return $this->hasMany(Year::class);

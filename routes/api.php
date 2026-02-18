@@ -32,6 +32,11 @@ use App\Http\Controllers\Api\Admin\SubjectController as AdminSubjectController;
 use App\Http\Controllers\Api\Admin\SemesterController as AdminSemesterController;
 use App\Http\Controllers\Api\Admin\CourseSectionController as AdminCourseSectionController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Api\Admin\SubscriptionController as AdminSubscriptionController;
+use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Api\Admin\RoleController;
+use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Student\NotificationController as StudentNotificationController;
 use App\Http\Controllers\Api\DeviceController;
 
@@ -154,6 +159,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('students/{studentId}/enroll', [AdminStudentController::class, 'enrollStudent']);
     Route::post('students/{studentId}/wallet', [AdminStudentController::class, 'updateWallet']);
     Route::post('students/{studentId}/toggle-ban', [AdminStudentController::class, 'toggleBan']);
+    Route::delete('students/{studentId}', [AdminStudentController::class, 'destroy']);
 
     // Instructors
     Route::get('instructors', [AdminInstructorController::class, 'index']);
@@ -162,6 +168,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('instructors/{instructorId}/permissions', [AdminInstructorController::class, 'updatePermissions']);
     Route::post('instructors/{instructorId}/toggle-suspend', [AdminInstructorController::class, 'toggleSuspend']);
     Route::post('instructors/{instructorId}/courses', [AdminInstructorController::class, 'createCourse']);
+    Route::delete('instructors/{instructorId}', [AdminInstructorController::class, 'destroy']);
 
     // Courses (إنشاء وتعديل وإحصائيات مثل الاستاذ)
     Route::get('courses', [AdminCourseController::class, 'index']);
@@ -208,6 +215,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('courses/{courseId}/enrollments-report', [AdminChatGroupController::class, 'enrollmentsReport']);
 
     // Notifications (إشعارات عامة / فرع / كورس)
+    Route::get('notifications', [AdminNotificationController::class, 'index']);
+    Route::get('notifications/unread-count', [AdminNotificationController::class, 'getUnreadCount']);
+    Route::post('notifications/{id}/read', [AdminNotificationController::class, 'markAsRead']);
     Route::post('notifications/send', [AdminNotificationController::class, 'send']);
 
     // عرض واجهة الطالب (Home - بانرات وأقسام)
@@ -250,6 +260,23 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('banners', [BannerController::class, 'store']);
     Route::put('banners/{bannerId}', [BannerController::class, 'update']);
     Route::delete('banners/{bannerId}', [BannerController::class, 'destroy']);
+
+    // Roles and Permissions
+    Route::apiResource('roles', RoleController::class);
+    Route::post('roles/{id}/permissions', [RoleController::class, 'syncPermissions']);
+    Route::get('permissions', [PermissionController::class, 'index']);
+
+    // Enrollments as Subscriptions
+    Route::get('subscriptions', [AdminSubscriptionController::class, 'index']);
+    Route::post('subscriptions/{id}/toggle-status', [AdminSubscriptionController::class, 'toggleStatus']);
+
+    // Settings
+    Route::get('settings', [AdminSettingController::class, 'index']);
+    Route::post('settings', [AdminSettingController::class, 'update']);
+
+    // Profile
+    Route::get('profile', [AdminProfileController::class, 'show']);
+    Route::post('profile', [AdminProfileController::class, 'update']);
 
     // Reports
     Route::get('reports/revenue', [ReportController::class, 'revenue']);

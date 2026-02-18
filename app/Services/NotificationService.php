@@ -16,6 +16,7 @@ class NotificationService
     public const SCOPE_DEPARTMENT = 'department';
     public const SCOPE_COURSE = 'course';
     public const SCOPE_CHAT = 'chat';
+    public const SCOPE_USER = 'user';
 
     public const TYPE_SYSTEM = 'system';
     public const TYPE_COURSE = 'course';
@@ -66,6 +67,14 @@ class NotificationService
             ->all();
         $data['course_id'] = (string) $courseId;
         return $this->sendToUserIds($userIds, $title, $message, self::SCOPE_COURSE, $courseId, self::TYPE_COURSE, $data);
+    }
+
+    /**
+     * ٤ - إشعارات مخصصة لمستخدم محدد (طالب أو معلم أو أدمن).
+     */
+    public function sendToUser(int $userId, string $title, string $message, array $data = []): array
+    {
+        return $this->sendToUserIds([$userId], $title, $message, self::SCOPE_USER, $userId, self::TYPE_SYSTEM, $data);
     }
 
     /**

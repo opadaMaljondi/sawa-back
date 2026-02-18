@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, UserMinus } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -40,6 +40,17 @@ const StudentsList = () => {
         } catch (e) {
             console.error(e);
             alert('فشل تغيير حالة الطالب');
+        }
+    };
+
+    const handleDelete = async (studentId) => {
+        if (!window.confirm(t('messages.confirmDelete'))) return;
+        try {
+            await studentsAPI.delete(studentId);
+            await fetchStudents(pagination.current_page || 1);
+        } catch (e) {
+            console.error(e);
+            alert(e.response?.data?.message || 'فشل حذف الطالب');
         }
     };
 
@@ -138,9 +149,17 @@ const StudentsList = () => {
                                                         <Edit size={16} />
                                                     </button>
                                                     <button
-                                                        className="action-btn action-btn-delete"
+                                                        className="action-btn action-btn-edit"
                                                         title={student.active ? 'حظر الطالب' : 'إلغاء الحظر'}
+                                                        style={{ color: student.active ? 'var(--color-warning-600)' : 'var(--color-success-600)' }}
                                                         onClick={() => handleToggleBan(student.id)}
+                                                    >
+                                                        <UserMinus size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="action-btn action-btn-delete"
+                                                        title={t('common.delete')}
+                                                        onClick={() => handleDelete(student.id)}
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>

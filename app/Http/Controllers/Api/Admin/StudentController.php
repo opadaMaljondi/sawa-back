@@ -195,4 +195,17 @@ class StudentController extends Controller
             'student' => $student,
         ]);
     }
+
+    /**
+     * Delete student
+     */
+    public function destroy($studentId)
+    {
+        $student = User::where('type', 'student')->findOrFail($studentId);
+        $student->delete();
+
+        return response()->json([
+            'message' => 'Student deleted successfully',
+        ]);
+    }
 }

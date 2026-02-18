@@ -6,15 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Services\CouponService;
-use App\Services\WalletService;
 use App\Services\ReferralService;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EnrollmentController extends Controller
 {
     protected WalletService $walletService;
+
     protected CouponService $couponService;
+
     protected ReferralService $referralService;
 
     public function __construct(
@@ -57,7 +59,7 @@ class EnrollmentController extends Controller
         return DB::transaction(function () use ($request) {
             $course = Course::findOrFail($request->course_id);
 
-            if (!$course->active || $course->status !== 'published') {
+            if (! $course->active || $course->status !== 'published') {
                 return response()->json([
                     'message' => 'This course is not available for enrollment.',
                 ], 422);
@@ -89,7 +91,7 @@ class EnrollmentController extends Controller
             $finalPrice = $price;
 
             // التحقق من الرصيد
-            if (!$this->walletService->hasEnoughBalance($student->id, $finalPrice)) {
+            if (! $this->walletService->hasEnoughBalance($student->id, $finalPrice)) {
                 return response()->json([
                     'message' => 'Insufficient balance',
                     'required' => $finalPrice,
@@ -139,6 +141,18 @@ class EnrollmentController extends Controller
             // تحديث عدد الطلاب
             if ($request->type === 'full_course') {
                 $course->increment('students_count');
+            }
+
+            // إرسال إشعار للآدمن
+            $notificationService = app(\App\Services\NotificationService::class);
+            $adminIds = \App\Models\User::where('type', 'admin')->pluck('id')->toArray();
+            foreach ($adminIds as $adminId) {
+                $notificationService->sendToUser(
+                    $adminId,
+                    'اشتراك جديد في كورس',
+                    "قام الطالب {$student->full_name} بالاشتراك في كورس: {$course->title}",
+                    ['course_id' => $course->id, 'student_id' => $student->id, 'type' => 'new_enrollment']
+                );
             }
 
             return response()->json([
