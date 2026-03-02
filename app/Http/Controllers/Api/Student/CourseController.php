@@ -6,44 +6,122 @@ use App\Http\Controllers\Controller;
 use App\Models\Banner;
 use App\Models\Course;
 use App\Models\Department;
+use App\Models\Enrollment;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 
 class CourseController extends Controller
 {
     /**
-     * Get home page data (banners and departments)
+     * Home page: banners, departments list, and student's active subscriptions.
      */
     public function home()
     {
+        $user = auth()->user();
+
         $banners = Banner::where('active', true)
             ->orderBy('order')
             ->get();
 
         $departments = Department::where('active', true)
-            ->with(['years.semesters.subjects'])
+            ->select('id', 'name', 'name_en', 'icon', 'color', 'order')
+            ->orderBy('order')
+            ->get();
+
+        $subscriptions = Enrollment::where('student_id', $user->id)
+            ->where('active', true)
+            ->with([
+                'course:id,title,image,price,students_count',
+                'course.instructor:id,full_name,image',
+                'course.subject:id,name,department_id',
+            ])
+            ->latest('enrolled_at')
             ->get();
 
         return response()->json([
-            'banners' => $banners,
-            'departments' => $departments,
+            'banners'       => $banners,
+            'departments'   => $departments,
+            'subscriptions' => $subscriptions,
         ]);
     }
 
     /**
-     * Get departments
+     * Get all departments (basic list).
      */
     public function departments()
     {
         $departments = Department::where('active', true)
-            ->with(['years.semesters.subjects'])
+            ->orderBy('order')
             ->get();
 
         return response()->json($departments);
     }
 
     /**
-     * Get courses by subject (للطالب: فقط الكورسات الموافق عليها والدروس الموافق عليها).
+     * Get department details with its years and semesters.
+     */
+    public function departmentShow($id)
+    {
+        $department = Department::where('active', true)
+            ->with([
+                'years' => fn ($q) => $q->where('active', true)->orderBy('order')
+                    ->with([
+                        'semesters' => fn ($q2) => $q2->where('active', true)->orderBy('order'),
+                    ]),
+            ])
+            ->findOrFail($id);
+
+        return response()->json($department);
+    }
+
+    /**
+     * Get courses for a department filtered by year and semester.
+     * Query params: year_id, semester_id
+     */
+    public function coursesByYearAndSemester(Request $request, $departmentId)
+    {
+        $request->validate([
+            'year_id'     => 'required|exists:years,id',
+            'semester_id' => 'required|exists:semesters,id',
+        ]);
+
+        $subjectIds = Subject::where('department_id', $departmentId)
+            ->where('year_id', $request->year_id)
+            ->where('semester_id', $request->semester_id)
+            ->where('active', true)
+            ->pluck('id');
+
+        $courses = Course::approvedForStudents()
+            ->whereIn('subject_id', $subjectIds)
+            ->with([
+                'instructor:id,full_name,image',
+                'sections:id,course_id',
+                'lessons:id,course_id,section_id,duration',
+            ])
+            ->get()
+            ->map(function ($course) {
+                $totalMinutes = $course->lessons->sum('duration');
+
+                return [
+                    'id'                => $course->id,
+                    'title'             => $course->title,
+                    'image'             => $course->image,
+                    'instructor'        => $course->instructor
+                        ? $course->instructor->only(['id', 'full_name', 'image'])
+                        : null,
+                    'price'             => $course->price,
+                    'sections_count'    => $course->sections->count(),
+                    'lessons_count'     => $course->lessons->count(),
+                    'total_hours'       => round($totalMinutes / 60, 1),
+                    'subscribers_count' => $course->students_count,
+                ];
+            });
+
+        return response()->json(['courses' => $courses]);
+    }
+
+    /**
+     * Get courses by subject.
      */
     public function getCoursesBySubject(Request $request, $subjectId)
     {
@@ -69,7 +147,7 @@ class CourseController extends Controller
     }
 
     /**
-     * Get course details (للطالب: فقط إن كان الكورس موافقاً عليه، والدروس الموافق عليها فقط).
+     * Get course details.
      */
     public function show($courseId)
     {
@@ -95,14 +173,14 @@ class CourseController extends Controller
         $isEnrolled = auth()->user()->hasAccessToCourse($courseId);
 
         return response()->json([
-            'course' => $course,
-            'is_enrolled' => $isEnrolled,
+            'course'         => $course,
+            'is_enrolled'    => $isEnrolled,
             'students_count' => $course->students_count,
         ]);
     }
 
     /**
-     * Search courses (للطالب: فقط الكورسات الموافق عليها).
+     * Search courses.
      */
     public function search(Request $request)
     {

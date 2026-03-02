@@ -38,6 +38,11 @@ use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Student\NotificationController as StudentNotificationController;
+use App\Http\Controllers\Api\Student\ProfileController as StudentProfileController;
+use App\Http\Controllers\Api\Student\CouponController as StudentCouponController;
+use App\Http\Controllers\Api\Student\SupportController as StudentSupportController;
+use App\Http\Controllers\Api\Student\AppController as StudentAppController;
+use App\Http\Controllers\Api\Student\NoteController as StudentNoteController;
 use App\Http\Controllers\Api\DeviceController;
 
 /*
@@ -59,7 +64,8 @@ Route::prefix('auth')->group(function () {
     // Student Auth
     Route::prefix('student')->group(function () {
         Route::post('register', [StudentAuthController::class, 'register']);
-        Route::post('login', [StudentAuthController::class, 'login']);
+        Route::post('login',    [StudentAuthController::class, 'login']);
+        Route::post('google',   [StudentAuthController::class, 'googleAuth']);
     });
 
     // Instructor Auth
@@ -77,9 +83,14 @@ Route::middleware('auth:sanctum')->prefix('devices')->group(function () {
 
 // Student Routes
 Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(function () {
-    // Courses
+    // Profile
+    Route::post('profile/complete', [StudentProfileController::class, 'complete']);
+
+    // Courses & Departments
     Route::get('home', [StudentCourseController::class, 'home']);
     Route::get('departments', [StudentCourseController::class, 'departments']);
+    Route::get('departments/{id}', [StudentCourseController::class, 'departmentShow']);
+    Route::get('departments/{departmentId}/courses', [StudentCourseController::class, 'coursesByYearAndSemester']);
     Route::get('courses/subject/{subjectId}', [StudentCourseController::class, 'getCoursesBySubject']);
     Route::get('courses/{courseId}', [StudentCourseController::class, 'show']);
     Route::get('courses', [StudentCourseController::class, 'search']);
@@ -108,6 +119,26 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
     Route::get('referrals/code', [ReferralController::class, 'myCode']);
     Route::get('referrals/stats', [ReferralController::class, 'stats']);
     Route::get('referrals', [ReferralController::class, 'referrals']);
+
+    // Profile
+    Route::get('profile', [StudentProfileController::class, 'show']);
+    Route::put('profile', [StudentProfileController::class, 'update']);
+
+    // Coupons
+    Route::get('coupons', [StudentCouponController::class, 'index']);
+    Route::post('coupons/check', [StudentCouponController::class, 'check']);
+
+    // Saved Notes / Files
+    Route::get('notes', [StudentNoteController::class, 'index']);
+
+    // Support
+    Route::get('support/info', [StudentSupportController::class, 'info']);
+    Route::post('support', [StudentSupportController::class, 'send']);
+
+    // App Info (Terms, Privacy, Settings)
+    Route::get('app/terms', [StudentAppController::class, 'terms']);
+    Route::get('app/privacy', [StudentAppController::class, 'privacy']);
+    Route::get('app/settings', [StudentAppController::class, 'settings']);
 });
 
 // Instructor Routes

@@ -25,6 +25,9 @@ class User extends Authenticatable
         'password',
         'image',
         'type',
+        'google_id',
+        'department_id',
+        'year_id',
         'referral_code',
         'active',
         'email_verified_at',
@@ -53,6 +56,16 @@ class User extends Authenticatable
     public function wallet()
     {
         return $this->hasOne(Wallet::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function year()
+    {
+        return $this->belongsTo(Year::class);
     }
 
     public function enrollments()
