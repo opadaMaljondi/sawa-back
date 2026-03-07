@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\YouTubeService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Lesson extends Model
 {
@@ -28,17 +29,19 @@ class Lesson extends Model
         'upload_status',
         'approval_status',
         'active',
+        'can_purchase_alone',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'is_free' => 'boolean',
         'can_download' => 'boolean',
+        'can_purchase_alone' => 'boolean',
         'active' => 'boolean',
         'duration' => 'integer',
     ];
 
-    protected $appends = ['video_playback_url'];
+    protected $appends = ['video_playback_url', 'video_embed_url', 'thumbnail_url'];
 
     /** الدروس الظاهرة للطالب (موافق عليها من الأدمن). */
     public function scopeApprovedForStudents($query)
@@ -51,14 +54,52 @@ class Lesson extends Model
      */
     public function getVideoPlaybackUrlAttribute(): ?string
     {
-        if ($this->video_provider !== 'youtube' || empty($this->video_reference)) {
+        if (empty($this->video_reference)) {
             return null;
         }
-        $ref = $this->video_reference;
-        if (str_contains($ref, 'youtube.com') || str_contains($ref, 'youtu.be')) {
-            return $ref;
+
+        if ($this->video_provider === 'local') {
+            return Storage::disk('public')->exists($this->video_reference) 
+                ? Storage::disk('public')->url($this->video_reference)
+                : (Storage::disk('local')->exists($this->video_reference) 
+                    ? asset('storage/' . $this->video_reference) // Assuming linked
+                    : null);
         }
-        return YouTubeService::playbackUrl($ref);
+
+        if ($this->video_provider === 'youtube') {
+            return YouTubeService::playbackUrl($this->video_reference);
+        }
+
+        return null;
+    }
+
+    public function getVideoEmbedUrlAttribute(): ?string
+    {
+        if (empty($this->video_reference)) {
+            return null;
+        }
+
+        if ($this->video_provider === 'local') {
+            return $this->video_playback_url; // Direct file URL works for video tag
+        }
+
+        if ($this->video_provider === 'youtube') {
+            return YouTubeService::embedUrl($this->video_reference);
+        }
+
+        return null;
+    }
+
+    public function getThumbnailAttribute($value): ?string
+    {
+        if (!$value) return null;
+        if (filter_var($value, FILTER_VALIDATE_URL)) return $value;
+        return Storage::disk('public')->url($value);
+    }
+
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        return $this->thumbnail;
     }
 
     public function course()

@@ -3,83 +3,102 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\User;
+use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class StudentController extends Controller
 {
     /**
-     * Get all students
+     * List all students with filters and search.
      */
     public function index(Request $request)
     {
-        $query = User::where('type', 'student')
-            ->with(['wallet']);
+        $query = User::where('type', 'student')->with(['wallet', 'department:id,name', 'year:id,name']);
 
-        // فلترة حسب القسم
-        if ($request->has('department_id')) {
-            $query->whereHas('enrollments.course.subject', function ($q) use ($request) {
-                $q->where('department_id', $request->department_id);
-            });
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(fn ($q) => $q->where('full_name', 'like', "%{$s}%")
+                ->orWhere('email', 'like', "%{$s}%")
+                ->orWhere('phone', 'like', "%{$s}%"));
         }
 
-        // فلترة حسب السنة
-        if ($request->has('year_id')) {
-            $query->whereHas('enrollments.course.subject', function ($q) use ($request) {
-                $q->where('year_id', $request->year_id);
-            });
+        if ($request->filled('department_id')) {
+            $query->where('department_id', $request->department_id);
         }
 
-        $students = $query->paginate(20);
+        if ($request->filled('year_id')) {
+            $query->where('year_id', $request->year_id);
+        }
 
-        return response()->json($students);
+        if ($request->filled('active')) {
+            $query->where('active', $request->boolean('active'));
+        }
+
+        return response()->json($query->latest()->paginate(20));
     }
 
     /**
-     * Create new student (by admin)
+     * Create a new student account.
      */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'required|string|unique:users,phone',
-            'password' => 'required|string|min:6',
-            'active' => 'boolean',
+            'full_name'     => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'phone'         => 'nullable|string|unique:users,phone',
+            'password'      => 'required|string|min:6',
+            'department_id' => 'nullable|exists:departments,id',
+            'year_id'       => 'nullable|exists:years,id',
+            'active'        => 'boolean',
         ]);
 
         $student = User::create([
-            'full_name' => $data['full_name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'],
-            'password' => Hash::make($data['password']),
-            'type' => 'student',
-            'active' => $request->boolean('active', true),
+            'full_name'     => $data['full_name'],
+            'email'         => $data['email'],
+            'phone'         => $data['phone'] ?? null,
+            'password'      => Hash::make($data['password']),
+            'department_id' => $data['department_id'] ?? null,
+            'year_id'       => $data['year_id'] ?? null,
+            'type'          => 'student',
+            'active'        => $request->boolean('active', true),
         ]);
 
-        if (method_exists($student, 'assignRole')) {
-            $student->assignRole('student');
-        }
+        $student->assignRole('student');
+
+        $student->wallet()->create([
+            'balance'         => 0,
+            'currency'        => 'SYP',
+            'total_deposited' => 0,
+            'total_spent'     => 0,
+            'active'          => true,
+        ]);
 
         return response()->json([
-            'message' => 'Student created successfully',
-            'student' => $student,
+            'message' => 'Student created successfully.',
+            'student' => $student->load('wallet'),
         ], 201);
     }
 
     /**
-     * Get student details
+     * Student details with enrollments and wallet.
      */
     public function show($studentId)
     {
         $student = User::where('type', 'student')
             ->with([
-                'wallet',
-                'enrollments.course',
-                'enrollments.section',
-                'enrollments.lesson',
+                'department:id,name',
+                'year:id,name',
+                'wallet.transactions' => fn ($q) => $q->latest()->limit(20),
+                'enrollments' => fn ($q) => $q->with([
+                    'course:id,title,price',
+                    'section:id,title',
+                    'lesson:id,title',
+                    'note:id,title',
+                ])->latest('enrolled_at'),
             ])
             ->findOrFail($studentId);
 
@@ -87,21 +106,23 @@ class StudentController extends Controller
     }
 
     /**
-     * Update student basic info
+     * Update student info.
      */
     public function update(Request $request, $studentId)
     {
         $student = User::where('type', 'student')->findOrFail($studentId);
 
         $data = $request->validate([
-            'full_name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $student->id,
-            'phone' => 'sometimes|string|unique:users,phone,' . $student->id,
-            'password' => 'nullable|string|min:6',
-            'active' => 'sometimes|boolean',
+            'full_name'     => 'sometimes|string|max:255',
+            'email'         => 'sometimes|email|unique:users,email,' . $student->id,
+            'phone'         => 'nullable|string|unique:users,phone,' . $student->id,
+            'password'      => 'nullable|string|min:6',
+            'department_id' => 'nullable|exists:departments,id',
+            'year_id'       => 'nullable|exists:years,id',
+            'active'        => 'sometimes|boolean',
         ]);
 
-        if (! empty($data['password'])) {
+        if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
@@ -110,80 +131,107 @@ class StudentController extends Controller
         $student->update($data);
 
         return response()->json([
-            'message' => 'Student updated successfully',
-            'student' => $student->fresh(),
+            'message' => 'Student updated successfully.',
+            'student' => $student->fresh(['wallet', 'department', 'year']),
         ]);
     }
 
     /**
-     * Enroll student in course
+     * Manually enroll student (free or paid, bypasses wallet).
      */
     public function enrollStudent(Request $request, $studentId)
     {
         $request->validate([
-            'course_id' => 'required|exists:courses,id',
-            'type' => 'required|in:full_course,section,lesson',
+            'course_id'  => 'required|exists:courses,id',
+            'type'       => 'required|in:full_course,section,lesson,attachment',
             'section_id' => 'nullable|exists:course_sections,id',
-            'lesson_id' => 'nullable|exists:lessons,id',
-            'free' => 'boolean',
+            'lesson_id'  => 'nullable|exists:lessons,id',
+            'note_id'    => 'nullable|exists:notes,id',
+            'free'       => 'boolean',
         ]);
 
         $student = User::where('type', 'student')->findOrFail($studentId);
-        $course = \App\Models\Course::findOrFail($request->course_id);
+        $course  = Course::findOrFail($request->course_id);
+
+        $exists = Enrollment::where('student_id', $student->id)
+            ->where('course_id', $course->id)
+            ->where('type', $request->type)
+            ->where('active', true)
+            ->when($request->type === 'section',    fn ($q) => $q->where('section_id', $request->section_id))
+            ->when($request->type === 'lesson',     fn ($q) => $q->where('lesson_id', $request->lesson_id))
+            ->when($request->type === 'attachment', fn ($q) => $q->where('note_id', $request->note_id))
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['message' => 'Student is already enrolled.'], 422);
+        }
+
+        $originalPrice = (float) $course->price;
 
         $enrollment = Enrollment::create([
-            'student_id' => $student->id,
-            'course_id' => $course->id,
-            'type' => $request->type,
-            'section_id' => $request->section_id ?? null,
-            'lesson_id' => $request->lesson_id ?? null,
-            'original_price' => $request->free ? 0 : $course->price,
-            'discount' => $request->free ? $course->price : 0,
-            'final_price' => $request->free ? 0 : $course->price,
-            'active' => true,
-            'enrolled_at' => now(),
+            'student_id'     => $student->id,
+            'course_id'      => $course->id,
+            'type'           => $request->type,
+            'section_id'     => $request->section_id ?? null,
+            'lesson_id'      => $request->lesson_id ?? null,
+            'note_id'        => $request->note_id ?? null,
+            'original_price' => $originalPrice,
+            'discount'       => $request->boolean('free') ? $originalPrice : 0,
+            'final_price'    => $request->boolean('free') ? 0 : $originalPrice,
+            'active'         => true,
+            'enrolled_at'    => now(),
         ]);
 
+        if ($request->type === 'full_course') {
+            $course->increment('students_count');
+        }
+
         return response()->json([
-            'message' => 'Student enrolled successfully',
+            'message'    => 'Student enrolled successfully.',
             'enrollment' => $enrollment,
         ], 201);
     }
 
     /**
-     * Update student wallet
+     * Adjust student wallet: deposit / withdraw / refund.
+     *
+     * - deposit  → add money (e.g. admin top-up)
+     * - withdraw → deduct money (e.g. correction)
+     * - refund   → return money after cancelling a purchase
      */
     public function updateWallet(Request $request, $studentId)
     {
         $request->validate([
-            'amount' => 'required|numeric',
-            'type' => 'required|in:deposit,withdraw',
+            'type'   => 'required|in:deposit,withdraw,refund',
+            'amount' => 'required|numeric|min:0.01',
+            'note'   => 'nullable|string|max:500',
         ]);
 
-        $student = User::where('type', 'student')->findOrFail($studentId);
+        $student       = User::where('type', 'student')->findOrFail($studentId);
         $walletService = app(\App\Services\WalletService::class);
+        $noteText      = $request->note ?? 'Admin adjustment';
+        $meta          = ['admin_id' => auth()->id(), 'note' => $request->note];
 
         if ($request->type === 'deposit') {
-            $walletService->deposit(
-                $student->id,
-                $request->amount,
-                'Admin deposit',
-                ['admin_id' => auth()->id()]
-            );
+            $walletService->deposit($student->id, (float) $request->amount, "إيداع: {$noteText}", $meta);
+        } elseif ($request->type === 'refund') {
+            $walletService->refund($student->id, (float) $request->amount, "استرداد: {$noteText}", $meta);
         } else {
-            $walletService->withdraw(
-                $student->id,
-                $request->amount,
-                'Admin withdrawal',
-                ['admin_id' => auth()->id()]
-            );
+            try {
+                $walletService->withdraw($student->id, (float) $request->amount, "خصم: {$noteText}", $meta);
+            } catch (\InvalidArgumentException) {
+                return response()->json(['message' => 'Insufficient balance.'], 400);
+            }
         }
 
-        return response()->json(['message' => 'Wallet updated successfully']);
+        return response()->json([
+            'message' => 'Wallet updated successfully.',
+            'wallet'  => Wallet::where('user_id', $student->id)->first(),
+        ]);
     }
 
     /**
-     * Ban/Unban student
+     * Ban / Unban student.
      */
     public function toggleBan($studentId)
     {
@@ -191,21 +239,19 @@ class StudentController extends Controller
         $student->update(['active' => !$student->active]);
 
         return response()->json([
-            'message' => $student->active ? 'Student activated' : 'Student banned',
-            'student' => $student,
+            'message' => $student->active ? 'Student activated.' : 'Student banned.',
+            'active'  => $student->active,
         ]);
     }
 
     /**
-     * Delete student
+     * Delete student.
      */
     public function destroy($studentId)
     {
         $student = User::where('type', 'student')->findOrFail($studentId);
         $student->delete();
 
-        return response()->json([
-            'message' => 'Student deleted successfully',
-        ]);
+        return response()->json(['message' => 'Student deleted successfully.']);
     }
 }

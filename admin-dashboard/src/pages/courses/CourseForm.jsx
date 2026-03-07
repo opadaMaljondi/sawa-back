@@ -22,7 +22,10 @@ const CourseForm = () => {
     price: '',
     status: 'draft',
     active: true,
+    allow_section_purchase: false,
+    allow_lesson_purchase: false,
   });
+  const [courseImage, setCourseImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,7 +59,10 @@ const CourseForm = () => {
           price: res.price ?? '',
           status: res.status,
           active: res.active,
+          allow_section_purchase: !!res.allow_section_purchase,
+          allow_lesson_purchase: !!res.allow_lesson_purchase,
         });
+        setCourseImage(null);
       } catch (e) {
         console.error(e);
         setError('فشل تحميل بيانات الكورس');
@@ -77,19 +83,25 @@ const CourseForm = () => {
     setError('');
     setLoading(true);
     try {
-      const payload = {
-        instructor_id: Number(form.instructor_id),
-        subject_id: Number(form.subject_id),
-        title: form.title,
-        description: form.description,
-        price: Number(form.price) || 0,
-        status: form.status,
-        active: !!form.active,
-      };
+      const fd = new FormData();
+      fd.append('instructor_id', Number(form.instructor_id));
+      fd.append('subject_id', Number(form.subject_id));
+      fd.append('title', form.title);
+      fd.append('description', form.description || '');
+      fd.append('price', Number(form.price) || 0);
+      fd.append('status', form.status);
+      fd.append('active', form.active ? '1' : '0');
+      fd.append('allow_section_purchase', form.allow_section_purchase ? '1' : '0');
+      fd.append('allow_lesson_purchase', form.allow_lesson_purchase ? '1' : '0');
+
+      if (courseImage) {
+        fd.append('image', courseImage);
+      }
+
       if (isEdit) {
-        await coursesAPI.update(id, payload);
+        await coursesAPI.update(id, fd);
       } else {
-        await coursesAPI.create(payload);
+        await coursesAPI.create(fd);
       }
       navigate('/courses');
     } catch (err) {
@@ -178,6 +190,37 @@ const CourseForm = () => {
             required
             fullWidth
           />
+
+          <div>
+            <label className="input-label">صورة الكورس (Banner)</label>
+            <input
+              type="file"
+              accept="image/*"
+              className="input-field"
+              onChange={(e) => setCourseImage(e.target.files?.[0] || null)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                id="allow_section_purchase"
+                checked={form.allow_section_purchase}
+                onChange={handleChange('allow_section_purchase')}
+              />
+              <label htmlFor="allow_section_purchase" className="text-sm">السماح بشراء الوحدات منفردة</label>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                id="allow_lesson_purchase"
+                checked={form.allow_lesson_purchase}
+                onChange={handleChange('allow_lesson_purchase')}
+              />
+              <label htmlFor="allow_lesson_purchase" className="text-sm">السماح بشراء الدروس منفردة</label>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

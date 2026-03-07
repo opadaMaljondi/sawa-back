@@ -4,10 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Course extends Model
 {
     use HasFactory;
+
+    protected $appends = ['image_url'];
 
     protected $fillable = [
         'subject_id',
@@ -36,6 +39,18 @@ class Course extends Model
         'rating' => 'decimal:2',
         'reviews_count' => 'integer',
     ];
+
+    public function getImageAttribute($value): ?string
+    {
+        if (!$value) return null;
+        if (filter_var($value, FILTER_VALIDATE_URL)) return $value;
+        return Storage::disk('public')->url($value);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image;
+    }
 
     public function subject()
     {

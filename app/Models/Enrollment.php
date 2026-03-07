@@ -15,6 +15,7 @@ class Enrollment extends Model
         'type',
         'section_id',
         'lesson_id',
+        'note_id',
         'original_price',
         'discount',
         'final_price',
@@ -28,13 +29,13 @@ class Enrollment extends Model
 
     protected $casts = [
         'original_price' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'final_price' => 'decimal:2',
-        'progress' => 'integer',
-        'completed' => 'boolean',
-        'active' => 'boolean',
-        'completed_at' => 'datetime',
-        'enrolled_at' => 'datetime',
+        'discount'       => 'decimal:2',
+        'final_price'    => 'decimal:2',
+        'progress'       => 'integer',
+        'completed'      => 'boolean',
+        'active'         => 'boolean',
+        'completed_at'   => 'datetime',
+        'enrolled_at'    => 'datetime',
     ];
 
     public function student()
@@ -55,5 +56,10 @@ class Enrollment extends Model
     public function lesson()
     {
         return $this->belongsTo(Lesson::class, 'lesson_id');
+    }
+
+    public function note()
+    {
+        return $this->belongsTo(Note::class, 'note_id');
     }
 }

@@ -76,6 +76,30 @@ class WalletService
         ]);
     }
 
+    public function refund(int $userId, float $amount, string $title, array $meta = []): Transaction
+    {
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $userId],
+            ['balance' => 0, 'currency' => 'SYP']
+        );
+
+        $balanceBefore = (float) $wallet->balance;
+        $wallet->balance = $balanceBefore + $amount;
+        $wallet->save();
+
+        return Transaction::create([
+            'wallet_id'          => $wallet->id,
+            'transaction_number' => 'TXN-' . strtoupper(Str::random(12)),
+            'type'               => 'refund',
+            'amount'             => $amount,
+            'balance_before'     => $balanceBefore,
+            'balance_after'      => $wallet->balance,
+            'title'              => $title,
+            'metadata'           => $meta,
+            'status'             => 'completed',
+        ]);
+    }
+
     public function getTransactions(int $userId, int $perPage = 20)
     {
         $wallet = Wallet::where('user_id', $userId)->first();

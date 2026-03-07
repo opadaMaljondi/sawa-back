@@ -62,15 +62,14 @@ const VideoPlayer = () => {
   }
 
   const renderPlayer = () => {
-    if (lesson.video_provider === 'youtube' && lesson.video_reference) {
-      const src = `https://www.youtube.com/embed/${lesson.video_reference}`;
+    if (lesson.video_provider === 'youtube' && lesson.video_embed_url) {
       return (
         <div
           className="w-full bg-black rounded-lg overflow-hidden"
           style={{ height: '70vh', maxHeight: 'calc(100vh - 180px)' }}
         >
           <iframe
-            src={src}
+            src={lesson.video_embed_url}
             title={lesson.title}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -111,6 +110,14 @@ const VideoPlayer = () => {
               <p>
                 <strong>عنوان الدرس:</strong> {lesson.title}
               </p>
+              {lesson.video_playback_url && (
+                <p>
+                  <strong>رابط YouTube: </strong>
+                  <a href={lesson.video_playback_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                    افتح في YouTube
+                  </a>
+                </p>
+              )}
               <p>
                 <strong>مزود الفيديو:</strong> {lesson.video_provider || 'غير محدد'}
               </p>

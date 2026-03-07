@@ -68,8 +68,15 @@ class ProfileController extends Controller
             $data['image'] = $request->file('image')->store('profiles', 'public');
         }
 
-        unset($data['current_password']);
-        $user->update(array_filter($data, fn($v) => !is_null($v)));
+        unset($data['current_password'], $data['password_confirmation']);
+
+        $allowed = ['full_name', 'phone', 'image', 'department_id', 'year_id', 'password'];
+        $update  = array_filter(
+            array_intersect_key($data, array_flip($allowed)),
+            fn ($v) => !is_null($v)
+        );
+
+        $user->update($update);
 
         return response()->json([
             'message' => 'Profile updated successfully.',

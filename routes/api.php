@@ -1,49 +1,49 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\Admin\BannerController;
+use App\Http\Controllers\Api\Admin\ChatGroupController as AdminChatGroupController;
+use App\Http\Controllers\Api\Admin\CourseController as AdminCourseController;
+use App\Http\Controllers\Api\Admin\CourseSectionController as AdminCourseSectionController;
+use App\Http\Controllers\Api\Admin\DashboardController;
+use App\Http\Controllers\Api\Admin\DepartmentController as AdminDepartmentController;
+use App\Http\Controllers\Api\Admin\ExamController as AdminExamController;
+use App\Http\Controllers\Api\Admin\InstructorController as AdminInstructorController;
+use App\Http\Controllers\Api\Admin\NoteController as AdminNoteController;
+use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Api\Admin\PermissionController;
+use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\RoleController;
+use App\Http\Controllers\Api\Admin\SemesterController as AdminSemesterController;
+use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
+use App\Http\Controllers\Api\Admin\SubjectController as AdminSubjectController;
+use App\Http\Controllers\Api\Admin\SubscriptionController as AdminSubscriptionController;
+use App\Http\Controllers\Api\Admin\VideoController as AdminVideoController;
+use App\Http\Controllers\Api\Admin\WalletController as AdminWalletController;
+use App\Http\Controllers\Api\Admin\YearController as AdminYearController;
 use App\Http\Controllers\Api\Auth\AuthController;
-use App\Http\Controllers\Api\Auth\StudentAuthController;
 use App\Http\Controllers\Api\Auth\InstructorAuthController;
+use App\Http\Controllers\Api\Auth\StudentAuthController;
+use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\Instructor\ChatGroupController;
+use App\Http\Controllers\Api\Instructor\CourseController as InstructorCourseController;
+use App\Http\Controllers\Api\Instructor\ExamController;
+use App\Http\Controllers\Api\Instructor\NoteController;
+use App\Http\Controllers\Api\Instructor\VideoController;
+use App\Http\Controllers\Api\Student\AppController as StudentAppController;
+use App\Http\Controllers\Api\Student\ChatController;
+use App\Http\Controllers\Api\Student\CouponController as StudentCouponController;
 use App\Http\Controllers\Api\Student\CourseController as StudentCourseController;
 use App\Http\Controllers\Api\Student\EnrollmentController;
-use App\Http\Controllers\Api\Student\WalletController;
-use App\Http\Controllers\Api\Student\VideoDownloadController;
-use App\Http\Controllers\Api\Student\ChatController;
-use App\Http\Controllers\Api\Student\ReferralController;
-use App\Http\Controllers\Api\Instructor\CourseController as InstructorCourseController;
-use App\Http\Controllers\Api\Instructor\VideoController;
-use App\Http\Controllers\Api\Instructor\NoteController;
-use App\Http\Controllers\Api\Instructor\ExamController;
-use App\Http\Controllers\Api\Instructor\ChatGroupController;
-use App\Http\Controllers\Api\Admin\DashboardController;
-use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
-use App\Http\Controllers\Api\Admin\InstructorController as AdminInstructorController;
-use App\Http\Controllers\Api\Admin\CourseController as AdminCourseController;
-use App\Http\Controllers\Api\Admin\BannerController;
-use App\Http\Controllers\Api\Admin\ReportController;
-use App\Http\Controllers\Api\Admin\VideoController as AdminVideoController;
-use App\Http\Controllers\Api\Admin\NoteController as AdminNoteController;
-use App\Http\Controllers\Api\Admin\ExamController as AdminExamController;
-use App\Http\Controllers\Api\Admin\ChatGroupController as AdminChatGroupController;
-use App\Http\Controllers\Api\Admin\DepartmentController as AdminDepartmentController;
-use App\Http\Controllers\Api\Admin\YearController as AdminYearController;
-use App\Http\Controllers\Api\Admin\SubjectController as AdminSubjectController;
-use App\Http\Controllers\Api\Admin\SemesterController as AdminSemesterController;
-use App\Http\Controllers\Api\Admin\CourseSectionController as AdminCourseSectionController;
-use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
-use App\Http\Controllers\Api\Admin\SubscriptionController as AdminSubscriptionController;
-use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
-use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
-use App\Http\Controllers\Api\Admin\RoleController;
-use App\Http\Controllers\Api\Admin\PermissionController;
-use App\Http\Controllers\Api\Student\NotificationController as StudentNotificationController;
-use App\Http\Controllers\Api\Student\ProfileController as StudentProfileController;
-use App\Http\Controllers\Api\Student\CouponController as StudentCouponController;
-use App\Http\Controllers\Api\Student\SupportController as StudentSupportController;
-use App\Http\Controllers\Api\Student\AppController as StudentAppController;
 use App\Http\Controllers\Api\Student\NoteController as StudentNoteController;
-use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\Student\ProfileController as StudentProfileController;
+use App\Http\Controllers\Api\Student\ReferralController;
+use App\Http\Controllers\Api\Student\SupportController as StudentSupportController;
+use App\Http\Controllers\Api\Student\VideoDownloadController;
+use App\Http\Controllers\Api\Student\WalletController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,6 +56,10 @@ use App\Http\Controllers\Api\DeviceController;
 |
 */
 
+// Public Routes (no token required - for registration screen)
+Route::get('departments', [StudentCourseController::class, 'departments']);
+Route::get('years', fn () => response()->json(\App\Models\Year::where('active', true)->orderBy('order')->get()));
+
 // Public Auth Routes
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'registerStudent']);
@@ -64,8 +68,8 @@ Route::prefix('auth')->group(function () {
     // Student Auth
     Route::prefix('student')->group(function () {
         Route::post('register', [StudentAuthController::class, 'register']);
-        Route::post('login',    [StudentAuthController::class, 'login']);
-        Route::post('google',   [StudentAuthController::class, 'googleAuth']);
+        Route::post('login', [StudentAuthController::class, 'login']);
+        Route::post('google', [StudentAuthController::class, 'googleAuth']);
     });
 
     // Instructor Auth
@@ -122,7 +126,7 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
 
     // Profile
     Route::get('profile', [StudentProfileController::class, 'show']);
-    Route::put('profile', [StudentProfileController::class, 'update']);
+    Route::match(['PUT', 'POST'], 'profile', [StudentProfileController::class, 'update']);
 
     // Coupons
     Route::get('coupons', [StudentCouponController::class, 'index']);
@@ -181,6 +185,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('dashboard/top-courses', [DashboardController::class, 'topCourses']);
     Route::get('dashboard/recent-enrollments', [DashboardController::class, 'recentEnrollments']);
+    Route::get('dashboard/pending-courses', [DashboardController::class, 'pendingCourses']);
+    Route::get('dashboard/revenue-by-instructor', [DashboardController::class, 'revenueByInstructor']);
+    Route::get('dashboard/revenue-by-department', [DashboardController::class, 'revenueByDepartment']);
+    Route::get('dashboard/student-growth', [DashboardController::class, 'studentGrowth']);
+    Route::get('dashboard/recent-transactions', [DashboardController::class, 'recentTransactions']);
+    Route::get('dashboard/coupon-stats', [DashboardController::class, 'couponStats']);
+    Route::get('dashboard/support', [DashboardController::class, 'support']);
+    Route::put('dashboard/support/{id}/status', [DashboardController::class, 'updateSupportStatus']);
 
     // Students
     Route::get('students', [AdminStudentController::class, 'index']);
@@ -227,6 +239,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('courses/{courseId}/make-first-free', [AdminVideoController::class, 'makeFirstFree']);
 
     // Notes (ملاحظات لأي كورس)
+    Route::get('notes', [AdminNoteController::class, 'indexAll']);
     Route::get('courses/{courseId}/notes', [AdminNoteController::class, 'index']);
     Route::post('notes', [AdminNoteController::class, 'store']);
     Route::put('notes/{noteId}', [AdminNoteController::class, 'update']);
@@ -299,7 +312,15 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Enrollments as Subscriptions
     Route::get('subscriptions', [AdminSubscriptionController::class, 'index']);
+    Route::get('subscriptions/{id}', [AdminSubscriptionController::class, 'show']);
     Route::post('subscriptions/{id}/toggle-status', [AdminSubscriptionController::class, 'toggleStatus']);
+    Route::post('subscriptions/{id}/refund', [AdminSubscriptionController::class, 'refund']);
+
+    // Wallets
+    Route::get('wallets', [AdminWalletController::class, 'index']);
+    Route::get('wallets/transactions', [AdminWalletController::class, 'transactions']);
+    Route::get('wallets/{userId}', [AdminWalletController::class, 'show']);
+    Route::post('wallets/{userId}/adjust', [AdminWalletController::class, 'adjust']);
 
     // Settings
     Route::get('settings', [AdminSettingController::class, 'index']);
@@ -318,5 +339,6 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 // Logout (for all users)
 Route::middleware('auth:sanctum')->post('logout', function (Request $request) {
     $request->user()->currentAccessToken()->delete();
+
     return response()->json(['message' => 'Logged out successfully']);
 });
