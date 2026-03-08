@@ -75,16 +75,49 @@ class VideoDownloadController extends Controller
     }
 
     /**
-     * Get downloaded videos
+     * Get downloaded videos with full lesson, course, and instructor details.
      */
     public function downloaded()
     {
         $downloaded = DownloadedLesson::where('student_id', auth()->id())
-            ->with(['lesson.course'])
+            ->with([
+                'lesson:id,course_id,section_id,title,thumbnail,price,duration',
+                'lesson.course:id,title,image,price,instructor_id',
+                'lesson.course.instructor:id,full_name,image',
+            ])
             ->orderBy('downloaded_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($record) {
+                $lesson = $record->lesson;
+                $course = $lesson?->course;
 
-        return response()->json($downloaded);
+                return [
+                    'token'         => $record->token,
+                    'quality'       => $record->quality,
+                    'file_size'     => $record->file_size,
+                    'status'        => $record->status,
+                    'downloaded_at' => $record->downloaded_at,
+                    'expires_at'    => $record->expires_at,
+                    'lesson'        => $lesson ? [
+                        'id'        => $lesson->id,
+                        'title'     => $lesson->title,
+                        'thumbnail' => $lesson->thumbnail,
+                        'price'     => $lesson->price,
+                        'duration'  => $lesson->duration,
+                    ] : null,
+                    'course'        => $course ? [
+                        'id'         => $course->id,
+                        'title'      => $course->title,
+                        'image'      => $course->image,
+                        'price'      => $course->price,
+                        'instructor' => $course->instructor
+                            ? $course->instructor->only(['id', 'full_name', 'image'])
+                            : null,
+                    ] : null,
+                ];
+            });
+
+        return response()->json(['downloaded' => $downloaded]);
     }
 
     /**

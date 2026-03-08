@@ -24,6 +24,7 @@ import SettingsPage from './pages/settings/SettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import BannersPage from './pages/banners/Banners';
+import NotesList from './pages/notes/NotesList';
 import RolesAndPermissions from './pages/permissions/RolesAndPermissions';
 import Login from './pages/auth/Login';
 import './assets/styles/index.css';
@@ -81,6 +82,7 @@ function App() {
                 <Route path="courses/new" element={<CourseForm />} />
                 <Route path="courses/:id" element={<CourseDetails />} />
                 <Route path="courses/:id/edit" element={<CourseForm />} />
+                <Route path="notes" element={<NotesList />} />
                 <Route path="courses/:courseId/lessons/:lessonId" element={<VideoPlayer />} />
 
                 {/* Academic structure */}

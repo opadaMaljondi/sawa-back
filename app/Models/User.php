@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -13,46 +14,55 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'full_name',
         'email',
         'phone',
         'password',
         'image',
+        'specialty',
+        'bio',
         'type',
+        'google_id',
+        'department_id',
+        'year_id',
         'referral_code',
         'active',
         'email_verified_at',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'active' => 'boolean',
     ];
 
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image) return null;
+        if (filter_var($this->image, FILTER_VALIDATE_URL)) return $this->image;
+        return Storage::disk('public')->url($this->image);
+    }
+
     public function wallet()
     {
         return $this->hasOne(Wallet::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function year()
+    {
+        return $this->belongsTo(Year::class);
     }
 
     public function enrollments()
@@ -73,16 +83,28 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if the user (student) has access to a course (has any active enrollment).
+     * Check if the user (student) has a full-course enrollment for a given course.
+     */
+    public function hasFullCourseAccess(int $courseId): bool
+    {
+        if ($this->type === 'admin') return true;
+        if ($this->type !== 'student') return false;
+
+        return Enrollment::where('student_id', $this->id)
+            ->where('course_id', $courseId)
+            ->where('type', 'full_course')
+            ->where('active', true)
+            ->exists();
+    }
+
+    /**
+     * Check if the user (student) has access to a course (any enrollment type).
      */
     public function hasAccessToCourse(int $courseId): bool
     {
-        if ($this->type === 'admin') {
-            return true;
-        }
-        if ($this->type !== 'student') {
-            return false;
-        }
+        if ($this->type === 'admin') return true;
+        if ($this->type !== 'student') return false;
+
         return Enrollment::where('student_id', $this->id)
             ->where('active', true)
             ->where('course_id', $courseId)
@@ -103,26 +125,42 @@ class User extends Authenticatable
             return false;
         }
 
-        $courseId = $lesson->course_id ?? $lesson->section?->course_id;
+        $courseId  = $lesson->course_id ?? $lesson->section?->course_id;
         if (!$courseId) {
             return false;
         }
 
         $sectionId = $lesson->section_id ?? $lesson->section?->id;
 
-        $query = Enrollment::where('student_id', $this->id)
+        return Enrollment::where('student_id', $this->id)
             ->where('active', true)
             ->where('course_id', $courseId)
             ->where(function ($q) use ($lesson, $sectionId) {
                 $q->where('type', 'full_course')
-                    ->orWhere('type', 'lesson')->where('lesson_id', $lesson->id);
+                  ->orWhere(fn ($q2) => $q2->where('type', 'lesson')->where('lesson_id', $lesson->id));
                 if ($sectionId) {
-                    $q->orWhere(function ($q2) use ($sectionId) {
-                        $q2->where('type', 'section')->where('section_id', $sectionId);
-                    });
+                    $q->orWhere(fn ($q2) => $q2->where('type', 'section')->where('section_id', $sectionId));
                 }
-            });
+            })
+            ->exists();
+    }
 
-        return $query->exists();
+    /**
+     * Check if the user (student) has access to a note/file.
+     */
+    public function hasAccessToNote(int $noteId, int $courseId): bool
+    {
+        if ($this->type === 'admin') return true;
+        if ($this->type !== 'student') return false;
+
+        // Full-course enrollment → access to all course notes
+        if ($this->hasFullCourseAccess($courseId)) return true;
+
+        // Individual note purchase
+        return Enrollment::where('student_id', $this->id)
+            ->where('type', 'attachment')
+            ->where('note_id', $noteId)
+            ->where('active', true)
+            ->exists();
     }
 }

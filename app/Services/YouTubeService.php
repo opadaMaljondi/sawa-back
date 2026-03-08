@@ -21,7 +21,7 @@ class YouTubeService
     }
 
     /**
-     * Get full playback URL from video ID.
+     * Get normalized playback URL from any YouTube URL or raw video ID.
      */
     public static function playbackUrl(string $videoId): string
     {
@@ -29,17 +29,34 @@ class YouTubeService
     }
 
     /**
+     * Get embed URL for iframe playback.
+     */
+    public static function embedUrl(string $videoReference): string
+    {
+        return 'https://www.youtube.com/embed/' . self::extractVideoId($videoReference);
+    }
+
+    /**
      * Extract YouTube video ID from full URL or return as-is if already an ID.
      */
     public static function extractVideoId(string $videoReference): string
     {
-        if (str_contains($videoReference, 'youtube.com/watch?v=')) {
+        // https://www.youtube.com/watch?v=VIDEO_ID
+        if (str_contains($videoReference, 'youtube.com/watch')) {
             parse_str(parse_url($videoReference, PHP_URL_QUERY) ?? '', $q);
             return (string) ($q['v'] ?? $videoReference);
         }
+        // https://youtu.be/VIDEO_ID
         if (str_contains($videoReference, 'youtu.be/')) {
-            return (string) trim(parse_url($videoReference, PHP_URL_PATH), '/');
+            $path = parse_url($videoReference, PHP_URL_PATH);
+            return (string) trim($path, '/');
         }
+        // https://www.youtube.com/shorts/VIDEO_ID
+        if (str_contains($videoReference, 'youtube.com/shorts/')) {
+            $path = parse_url($videoReference, PHP_URL_PATH);
+            return (string) basename($path);
+        }
+        // Already a raw video ID
         return $videoReference;
     }
 
@@ -94,11 +111,30 @@ class YouTubeService
             $video->setSnippet($snippet);
             $video->setStatus($status);
 
-            $response = $youtube->videos->insert('snippet,status', $video, [
-                'data' => file_get_contents($localPath),
-                'mimeType' => 'video/mp4',
-                'uploadType' => 'media',
-            ]);
+            // Use resumable (chunked) upload — avoids loading entire file into memory
+            $client->setDefer(true);
+            /** @var \Psr\Http\Message\RequestInterface $insertRequest */
+            $insertRequest = $youtube->videos->insert('snippet,status', $video);
+
+            $chunkSize = 5 * 1024 * 1024; // 5 MB per chunk
+            $media = new \Google\Http\MediaFileUpload(
+                $client,
+                $insertRequest,
+                'video/mp4',
+                null,
+                true,
+                $chunkSize
+            );
+            $media->setFileSize(filesize($localPath));
+            $client->setDefer(false); // restore before chunk upload
+
+            $response = false;
+            $handle = fopen($localPath, 'rb');
+            while (!$response && !feof($handle)) {
+                $chunk = fread($handle, $chunkSize);
+                $response = $media->nextChunk($chunk);
+            }
+            fclose($handle);
 
             $this->lastError = null;
             return self::playbackUrl($response->getId());

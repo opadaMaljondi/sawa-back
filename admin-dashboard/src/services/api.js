@@ -76,8 +76,23 @@ export const teachersAPI = {
 export const coursesAPI = {
   getAll: (params) => api.get('/admin/courses', { params }),
   getById: (id) => api.get(`/admin/courses/${id}`),
-  create: (data) => api.post('/admin/courses', data),
-  update: (id, data) => api.put(`/admin/courses/${id}`, data),
+  create: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/admin/courses', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/admin/courses', data);
+  },
+  update: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/admin/courses/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/admin/courses/${id}`, data);
+  },
   delete: (id) => api.delete(`/admin/courses/${id}`),
   approve: (id) => api.post(`/admin/courses/${id}/approve`),
   reject: (id, data) => api.post(`/admin/courses/${id}/reject`, data),
@@ -98,11 +113,21 @@ export const courseSectionsAPI = {
 
 // Videos / Lessons (Admin\VideoController)
 export const videosAPI = {
-  upload: (formData) =>
+  upload: (formData, onUploadProgress) =>
     api.post('/admin/videos', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0, // no timeout for large video uploads
+      onUploadProgress,
     }),
-  update: (lessonId, data) => api.put(`/admin/videos/${lessonId}`, data),
+  update: (lessonId, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/admin/videos/${lessonId}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/admin/videos/${lessonId}`, data);
+  },
   delete: (lessonId) => api.delete(`/admin/videos/${lessonId}`),
 };
 
@@ -195,6 +220,25 @@ export const notificationsAPI = {
   getNotifications: (page = 1) => api.get(`/admin/notifications?page=${page}`),
   getUnreadCount: () => api.get('/admin/notifications/unread-count'),
   markAsRead: (id) => api.post(`/admin/notifications/${id}/read`),
+};
+
+// Notes / Files
+export const notesAPI = {
+  listAll: () => api.get('/admin/notes'),
+  getAll: (courseId) => api.get(`/admin/courses/${courseId}/notes`),
+  create: (data) => api.post('/admin/notes', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  update: (id, data) => api.put(`/admin/notes/${id}`, data),
+  delete: (id) => api.delete(`/admin/notes/${id}`),
+};
+
+// Exams
+export const examsAPI = {
+  getAll: (courseId) => api.get(`/admin/courses/${courseId}/exams`),
+  create: (data) => api.post('/admin/exams', data),
+  update: (id, data) => api.put(`/admin/exams/${id}`, data),
+  delete: (id) => api.delete(`/admin/exams/${id}`),
 };
 
 // Auth (shared login for admin/instructor/student)

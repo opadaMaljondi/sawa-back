@@ -11,7 +11,19 @@ use Illuminate\Support\Facades\Storage;
 class NoteController extends Controller
 {
     /**
-     * Get notes for any course
+     * Get all notes (for admin list)
+     */
+    public function indexAll()
+    {
+        $notes = Note::with('course:id,title')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($notes);
+    }
+
+    /**
+     * Get notes for a specific course
      */
     public function index($courseId)
     {
@@ -32,7 +44,11 @@ class NoteController extends Controller
         $request->validate([
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
-            'file' => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'description' => 'nullable|string',
+            'file' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx|max:20480',
+            'price' => 'nullable|numeric|min:0',
+            'is_free' => 'nullable|boolean',
+            'prevent_download' => 'nullable|boolean',
         ]);
 
         $course = Course::findOrFail($request->course_id);
@@ -42,10 +58,14 @@ class NoteController extends Controller
         $note = Note::create([
             'course_id' => $course->id,
             'title' => $request->title,
+            'description' => $request->description,
             'file_path' => $filePath,
             'file_name' => $file->getClientOriginalName(),
             'file_type' => $file->getClientOriginalExtension(),
             'file_size' => $file->getSize(),
+            'price' => $request->input('price', 0),
+            'is_free' => $request->boolean('is_free'),
+            'prevent_download' => $request->boolean('prevent_download'),
             'uploaded_by' => auth()->id(),
         ]);
 
@@ -64,9 +84,20 @@ class NoteController extends Controller
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'is_free' => 'nullable|boolean',
+            'prevent_download' => 'nullable|boolean',
+            'active' => 'nullable|boolean',
         ]);
 
-        $note->update($request->only(['title']));
+        $data = $request->only(['title', 'description', 'price']);
+        
+        if ($request->has('is_free')) $data['is_free'] = $request->boolean('is_free');
+        if ($request->has('prevent_download')) $data['prevent_download'] = $request->boolean('prevent_download');
+        if ($request->has('active')) $data['active'] = $request->boolean('active');
+
+        $note->update($data);
 
         return response()->json([
             'message' => 'Note updated successfully',

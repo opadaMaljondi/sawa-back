@@ -14,6 +14,7 @@ import {
     Settings,
     Bell,
     Image as ImageIcon,
+    FileText,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
             ]
         },
         { path: '/notifications', icon: Bell, label: t('common.notifications') },
+        { path: '/notes', icon: FileText, label: 'إدارة الملفات' },
         { path: '/settings', icon: Settings, label: t('nav.settings') }
     ];
 

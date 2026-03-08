@@ -24,6 +24,8 @@ class Note extends Model
         'uploaded_by',
     ];
 
+    protected $appends = ['file_url'];
+
     protected $casts = [
         'file_size' => 'integer',
         'price' => 'decimal:2',
@@ -45,5 +47,10 @@ class Note extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function getFileUrlAttribute()
+    {
+        return $this->file_path ? asset('storage/' . $this->file_path) : null;
     }
 }

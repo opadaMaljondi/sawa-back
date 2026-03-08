@@ -20,66 +20,117 @@ class VideoController extends Controller
     }
 
     /**
-     * Upload video (أي كورس)
+     * Create lesson with video.
+     *
+     * Two modes (mutually exclusive):
+     *   A) youtube_url — store an existing YouTube link directly (no upload)
+     *   B) video file  — upload file to YouTube; falls back to local storage on failure
+     *
+     * POST /admin/videos
+     * Fields: course_id, title, section_id?, price?, duration?, is_free?, order?,
+     *         youtube_url  OR  video (file)
      */
     public function upload(Request $request)
     {
         $request->validate([
-            'course_id' => 'required|exists:courses,id',
-            'section_id' => 'nullable|exists:course_sections,id',
-            'title' => 'required|string|max:255',
-            'video' => 'required|file|mimes:mp4,avi,mov|max:10240',
-            'is_free' => 'boolean',
-            'order' => 'nullable|integer',
+            'course_id'          => 'required|exists:courses,id',
+            'section_id'         => 'nullable|exists:course_sections,id',
+            'title'              => 'required|string|max:255',
+            'description'        => 'nullable|string',
+            'price'              => 'nullable|numeric|min:0',
+            'duration'           => 'nullable|integer|min:0',
+            'is_free'            => 'boolean',
+            'can_download'       => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'order'              => 'nullable|integer',
+            'video_provider'     => 'nullable|in:youtube,local',
+            'thumbnail'          => 'nullable|image|max:2048',
+            // One of these is required (youtube_url and video_url are aliases):
+            'youtube_url'  => 'required_without_all:video_url,video|nullable|url',
+            'video_url'    => 'required_without_all:youtube_url,video|nullable|url',
+            'video'        => 'required_without_all:youtube_url,video_url|nullable|file|mimes:mp4,avi,mov|max:512000',
         ]);
 
         $course = Course::findOrFail($request->course_id);
-        $tempPath = $request->file('video')->store('videos/temp', 'local');
-        $fullTempPath = storage_path('app/' . $tempPath);
 
-        $videoId = $this->youtubeService->uploadVideo($fullTempPath, [
-            'title' => $request->title,
-            'description' => "Course: {$course->title}",
-            'privacy_status' => 'unlisted',
-        ]);
+        // ── Mode A: YouTube URL provided directly ─────────────────────────────
+        $youtubeUrl = $request->filled('youtube_url') ? $request->youtube_url : $request->video_url;
+        $videoProvider = $request->input('video_provider', 'youtube');
 
-        $videoProvider = 'youtube';
-        $videoReference = null;
+        if ($youtubeUrl) {
+            $videoProvider  = 'youtube';
+            $videoReference = $youtubeUrl;
+            $message        = 'Lesson created with YouTube URL.';
 
-        if ($videoId) {
-            $videoReference = $videoId;
-            Storage::delete($tempPath);
+        // ── Mode B: File upload ───────────────────────────────────────────────
         } else {
-            // Fallback: save video locally when YouTube is not configured or fails
-            $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $localFileName = Str::random(40) . '.' . $extension;
-            $localPath = "videos/lessons/course_{$course->id}/{$localFileName}";
-            Storage::disk('local')->put($localPath, file_get_contents($fullTempPath));
-            Storage::delete($tempPath);
-            $videoProvider = 'local';
-            $videoReference = $localPath;
+            $tempPath     = $request->file('video')->store('videos/temp', 'local');
+            $fullTempPath = storage_path('app/' . $tempPath);
+
+            $uploadedUrl = null;
+            // Only upload to YouTube if provider is youtube
+            if ($videoProvider === 'youtube') {
+                $uploadedUrl = $this->youtubeService->uploadVideo($fullTempPath, [
+                    'title'          => $request->title,
+                    'description'    => $request->description ?? "Course: {$course->title}",
+                    'privacy_status' => 'unlisted',
+                ]);
+            }
+
+            if ($uploadedUrl) {
+                $videoReference = $uploadedUrl;
+                Storage::disk('local')->delete($tempPath);
+                $message = 'Video uploaded successfully to YouTube.';
+            } else {
+                // If user EXPLICITLY chose youtube, and it failed, return error
+                if ($request->video_provider === 'youtube') {
+                    Storage::disk('local')->delete($tempPath);
+                    return response()->json([
+                        'message' => 'Failed to upload video to YouTube: ' . ($this->youtubeService->getLastError() ?? 'Unauthorized/Unknown error'),
+                        'error' => $this->youtubeService->getLastError()
+                    ], 422);
+                }
+
+                // Otherwise (they chose local OR it was a best-effort without explicit provider), save locally
+                $ext           = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
+                $localPath     = "videos/lessons/course_{$course->id}/" . Str::random(40) . ".{$ext}";
+                
+                Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
+                Storage::disk('local')->delete($tempPath);
+                
+                $videoProvider  = 'local';
+                $videoReference = $localPath;
+                $message        = 'Video saved locally.';
+            }
+        }
+
+        $thumbnailPath = null;
+        if ($request->hasFile('thumbnail')) {
+            $thumbnailPath = $request->file('thumbnail')->store('thumbnails/lessons', 'public');
         }
 
         $lesson = Lesson::create([
-            'course_id' => $course->id,
-            'section_id' => $request->section_id,
-            'title' => $request->title,
-            'video_provider' => $videoProvider,
-            'video_reference' => $videoReference,
-            'is_free' => $request->boolean('is_free', false),
-            'active' => true,
-            'order' => (int) ($request->order ?? 1),
+            'course_id'          => $course->id,
+            'section_id'         => $request->section_id,
+            'title'              => $request->title,
+            'description'        => $request->description,
+            'price'              => $request->filled('price') ? (float) $request->price : null,
+            'duration'           => $request->filled('duration') ? (int) $request->duration : 0,
+            'video_provider'     => $videoProvider,
+            'video_reference'    => $videoReference,
+            'is_free'            => $request->boolean('is_free', false),
+            'can_download'       => $request->boolean('can_download', true),
+            'can_purchase_alone' => $request->boolean('can_purchase_alone', false),
+            'thumbnail'          => $thumbnailPath,
+            'active'             => true,
+            'order'              => (int) ($request->order ?? 1),
         ]);
 
-        $message = $videoProvider === 'youtube'
-            ? 'Video uploaded successfully to YouTube.'
-            : 'Video saved locally. (YouTube upload skipped: ' . ($this->youtubeService->getLastError() ?? 'not configured') . ')';
-
         return response()->json([
-            'message' => $message,
-            'lesson' => $lesson,
-            'video_provider' => $videoProvider,
-            'video_playback_url' => $videoProvider === 'youtube' ? $lesson->video_reference : null,
+            'message'           => $message,
+            'lesson'            => $lesson,
+            'video_provider'    => $videoProvider,
+            'video_playback_url'=> $lesson->video_playback_url,
         ], 201);
     }
 
@@ -91,28 +142,55 @@ class VideoController extends Controller
         $lesson = Lesson::findOrFail($lessonId);
 
         $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'is_free' => 'boolean',
-            'order' => 'nullable|integer',
-            'approval_status' => 'sometimes|in:pending,approved,rejected',
-            'active' => 'boolean',
+            'title'              => 'sometimes|string|max:255',
+            'description'        => 'nullable|string',
+            'price'              => 'nullable|numeric|min:0',
+            'duration'           => 'nullable|integer|min:0',
+            'is_free'            => 'boolean',
+            'can_download'       => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'order'              => 'nullable|integer',
+            'approval_status'    => 'sometimes|in:pending,approved,rejected',
+            'active'             => 'boolean',
+            'video_provider'     => 'sometimes|in:youtube,local',
+            'thumbnail'          => 'nullable|image|max:2048',
+            'youtube_url'        => 'sometimes|url',
         ]);
 
-        $lesson->update($request->only([
-            'title', 'description', 'is_free', 'order',
-            'approval_status', 'active',
-        ]));
+        $data = $request->only([
+            'title', 'description', 'price', 'duration', 'order',
+            'approval_status', 'video_provider',
+        ]);
+
+        $data['is_free'] = $request->boolean('is_free');
+        $data['can_download'] = $request->boolean('can_download');
+        $data['can_purchase_alone'] = $request->boolean('can_purchase_alone');
+        $data['active'] = $request->boolean('active');
+
+        if ($request->has('youtube_url')) {
+            $data['video_provider'] = 'youtube';
+            $data['video_reference'] = $request->youtube_url;
+        }
+
+        if ($request->hasFile('thumbnail')) {
+            if ($lesson->thumbnail) {
+                Storage::disk('public')->delete($lesson->thumbnail);
+            }
+            $data['thumbnail'] = $request->file('thumbnail')->store('thumbnails/lessons', 'public');
+        }
+
+        $lesson->update($data);
 
         if ($request->has('title') && $lesson->video_provider === 'youtube') {
             $this->youtubeService->updateVideo($lesson->video_reference, [
-                'title' => $request->title,
+                'title'       => $lesson->title,
+                'description' => $lesson->description,
             ]);
         }
 
         return response()->json([
             'message' => 'Video updated successfully',
-            'lesson' => $lesson->fresh(),
+            'lesson'  => $lesson->fresh(),
         ]);
     }
 
