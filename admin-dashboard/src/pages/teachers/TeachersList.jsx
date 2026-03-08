@@ -68,7 +68,7 @@ const TeachersList = () => {
                 <Button
                     variant="primary"
                     icon={<Plus size={18} />}
-                    onClick={() => window.location.href = '/teachers/new'}
+                    onClick={() => navigate('/teachers/new')}
                 >
                     {t('teachers.addTeacher')}
                 </Button>
