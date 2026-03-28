@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Exam extends Model
 {
@@ -12,7 +13,6 @@ class Exam extends Model
         'description',
         'attachment',
         'active',
-        'duration',
         'available_from',
         'available_until',
         'created_by',
@@ -24,14 +24,23 @@ class Exam extends Model
         'available_until' => 'datetime',
     ];
 
+    protected $appends = ['attachment_url'];
+
+    public function getAttachmentUrlAttribute(): ?string
+    {
+        if (! $this->attachment) {
+            return null;
+        }
+        if (filter_var($this->attachment, FILTER_VALIDATE_URL)) {
+            return $this->attachment;
+        }
+
+        return Storage::disk('public')->url($this->attachment);
+    }
+
     public function course()
     {
         return $this->belongsTo(Course::class);
-    }
-
-    public function questions()
-    {
-        return $this->hasMany(ExamQuestion::class, 'exam_id');
     }
 
     public function creator()

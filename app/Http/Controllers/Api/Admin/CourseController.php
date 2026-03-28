@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\Enrollment;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CourseController extends Controller
 {
@@ -17,7 +20,7 @@ class CourseController extends Controller
 
         // فلترة وبحث
         if ($request->has('keyword')) {
-            $query->where('title', 'like', '%' . $request->keyword . '%');
+            $query->where('title', 'like', '%'.$request->keyword.'%');
         }
 
         if ($request->has('status')) {
@@ -38,13 +41,18 @@ class CourseController extends Controller
      */
     public function store(Request $request)
     {
+        $imageRule = $request->hasFile('image')
+            ? ['nullable', 'image', 'max:5120']
+            : ['nullable', 'string', 'max:500'];
+
         $request->validate([
             'instructor_id' => 'required|exists:users,id',
             'subject_id' => 'required|exists:subjects,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $imageRule,
             'price' => 'required|numeric|min:0',
+            'admin_commission' => 'nullable|numeric|min:0|max:100',
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
             'free_first_lesson' => 'boolean',
@@ -52,11 +60,18 @@ class CourseController extends Controller
             'active' => 'boolean',
         ]);
 
-        $instructor = \App\Models\User::find($request->instructor_id);
+        $instructor = User::find($request->instructor_id);
         if ($instructor->type !== 'instructor') {
             return response()->json([
                 'message' => 'The selected user is not an instructor. Use a user with type "instructor".',
             ], 422);
+        }
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('courses', 'public');
+        } elseif ($request->filled('image')) {
+            $imagePath = $request->input('image');
         }
 
         $course = Course::create([
@@ -64,8 +79,9 @@ class CourseController extends Controller
             'subject_id' => $request->subject_id,
             'title' => $request->title,
             'description' => $request->description ?? '',
-            'image' => $request->image,
+            'image' => $imagePath,
             'price' => $request->price,
+            'admin_commission' => $request->input('admin_commission', 0),
             'allow_section_purchase' => $request->boolean('allow_section_purchase', false),
             'allow_lesson_purchase' => $request->boolean('allow_lesson_purchase', false),
             'free_first_lesson' => $request->boolean('free_first_lesson', false),
@@ -86,11 +102,16 @@ class CourseController extends Controller
     {
         $course = Course::findOrFail($courseId);
 
+        $imageRule = $request->hasFile('image')
+            ? ['nullable', 'image', 'max:5120']
+            : ['nullable', 'string', 'max:500'];
+
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $imageRule,
             'price' => 'sometimes|numeric|min:0',
+            'admin_commission' => 'sometimes|nullable|numeric|min:0|max:100',
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
             'free_first_lesson' => 'boolean',
@@ -98,11 +119,23 @@ class CourseController extends Controller
             'active' => 'sometimes|boolean',
         ]);
 
-        $course->update($request->only([
-            'title', 'description', 'image', 'price',
+        $data = $request->only([
+            'title', 'description', 'price', 'admin_commission',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
             'status', 'active',
-        ]));
+        ]);
+
+        if ($request->hasFile('image')) {
+            $oldPath = $course->getRawOriginal('image');
+            if ($oldPath && ! filter_var($oldPath, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+            $data['image'] = $request->file('image')->store('courses', 'public');
+        } elseif ($request->has('image') && is_string($request->input('image'))) {
+            $data['image'] = $request->input('image');
+        }
+
+        $course->update($data);
 
         return response()->json([
             'message' => 'Course updated successfully',
@@ -117,7 +150,7 @@ class CourseController extends Controller
     {
         $course = Course::findOrFail($courseId);
 
-        $enrollments = \App\Models\Enrollment::where('course_id', $courseId)
+        $enrollments = Enrollment::where('course_id', $courseId)
             ->where('active', true)
             ->get();
 
@@ -134,6 +167,86 @@ class CourseController extends Controller
     }
 
     /**
+     * Paginated enrollments (subscriptions) for this course with admin / teacher revenue split.
+     */
+    public function subscriptions(Request $request, $courseId)
+    {
+        $course = Course::findOrFail($courseId);
+        $commissionRate = (float) ($course->admin_commission ?? 0) / 100;
+
+        $query = Enrollment::query()
+            ->where('course_id', $courseId)
+            ->with([
+                'student:id,full_name,email',
+                'section:id,title',
+                'lesson:id,title',
+                'note:id,title',
+            ])
+            ->orderByDesc('enrolled_at');
+
+        $perPage = min(max($request->integer('per_page', 25), 5), 100);
+
+        $paginator = $query->paginate($perPage);
+
+        $paginator->through(function (Enrollment $e) use ($course, $commissionRate) {
+            $final = (float) $e->final_price;
+            $adminAmount = round($final * $commissionRate, 2);
+            $teacherAmount = round($final - $adminAmount, 2);
+
+            return [
+                'id' => $e->id,
+                'student' => $e->student,
+                'type' => $e->type,
+                'type_label' => $this->enrollmentTypeLabel($e->type),
+                'item_title' => $this->enrollmentItemTitle($e, $course),
+                'original_price' => (float) $e->original_price,
+                'discount' => (float) $e->discount,
+                'final_price' => $final,
+                'admin_amount' => $adminAmount,
+                'teacher_amount' => $teacherAmount,
+                'active' => (bool) $e->active,
+                'enrolled_at' => $e->enrolled_at?->toIso8601String(),
+            ];
+        });
+
+        $activeFinal = (float) Enrollment::where('course_id', $courseId)->where('active', true)->sum('final_price');
+        $totalAdmin = round($activeFinal * $commissionRate, 2);
+        $summary = [
+            'admin_commission_percent' => (float) ($course->admin_commission ?? 0),
+            'total_final_price' => round($activeFinal, 2),
+            'total_admin_amount' => $totalAdmin,
+            'total_teacher_amount' => round($activeFinal - $totalAdmin, 2),
+        ];
+
+        $payload = $paginator->toArray();
+        $payload['summary'] = $summary;
+
+        return response()->json($payload);
+    }
+
+    private function enrollmentTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'full_course' => 'كورس كامل',
+            'section' => 'وحدة',
+            'lesson' => 'درس (فيديو)',
+            'attachment', 'note' => 'ملف مرفق',
+            default => $type,
+        };
+    }
+
+    private function enrollmentItemTitle(Enrollment $e, Course $course): string
+    {
+        return match ($e->type) {
+            'full_course' => $course->title,
+            'section' => $e->section?->title ?? '—',
+            'lesson' => $e->lesson?->title ?? '—',
+            'attachment', 'note' => $e->note?->title ?? '—',
+            default => '—',
+        };
+    }
+
+    /**
      * Get course details
      */
     public function show($courseId)
@@ -146,7 +259,7 @@ class CourseController extends Controller
             'sections.lessons',
             'enrollments.student',
             'notes',
-            'exams.questions',
+            'exams',
         ])->findOrFail($courseId);
 
         return response()->json($course);

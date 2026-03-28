@@ -38,8 +38,8 @@ class CourseController extends Controller
             ->get();
 
         return response()->json([
-            'banners'       => $banners,
-            'departments'   => $departments,
+            'banners' => $banners,
+            'departments' => $departments,
             'subscriptions' => $subscriptions,
         ]);
     }
@@ -78,7 +78,7 @@ class CourseController extends Controller
     public function coursesByYearAndSemester(Request $request, $departmentId)
     {
         $request->validate([
-            'year_id'     => 'required|exists:years,id',
+            'year_id' => 'required|exists:years,id',
             'semester_id' => 'required|exists:semesters,id',
         ]);
 
@@ -100,16 +100,16 @@ class CourseController extends Controller
                 $totalMinutes = $course->lessons->sum('duration');
 
                 return [
-                    'id'                => $course->id,
-                    'title'             => $course->title,
-                    'image'             => $course->image,
-                    'instructor'        => $course->instructor
+                    'id' => $course->id,
+                    'title' => $course->title,
+                    'image' => $course->image,
+                    'instructor' => $course->instructor
                         ? $course->instructor->only(['id', 'full_name', 'image'])
                         : null,
-                    'price'             => $course->price,
-                    'sections_count'    => $course->sections->count(),
-                    'lessons_count'     => $course->lessons->count(),
-                    'total_hours'       => round($totalMinutes / 60, 1),
+                    'price' => $course->price,
+                    'sections_count' => $course->sections->count(),
+                    'lessons_count' => $course->lessons->count(),
+                    'total_hours' => round($totalMinutes / 60, 1),
                     'subscribers_count' => $course->students_count,
                 ];
             });
@@ -139,11 +139,11 @@ class CourseController extends Controller
                 'sections' => fn ($q) => $q->orderBy('order'),
                 'sections.lessons' => fn ($q) => $q->approvedForStudents()->orderBy('order'),
                 'notes' => fn ($q) => $q->where('active', true),
-                'exams' => fn ($q) => $q->where('active', true)->with('questions'),
+                'exams' => fn ($q) => $q->where('active', true),
             ])
             ->find($courseId);
 
-        if (!$course) {
+        if (! $course) {
             return response()->json(['message' => 'Course not found or not available.'], 404);
         }
 
@@ -155,42 +155,42 @@ class CourseController extends Controller
             ->where('active', true)
             ->get();
 
-        $hasFullCourse      = $enrollments->where('type', 'full_course')->isNotEmpty();
+        $hasFullCourse = $enrollments->where('type', 'full_course')->isNotEmpty();
         $enrolledSectionIds = $enrollments->where('type', 'section')->pluck('section_id')->all();
-        $enrolledLessonIds  = $enrollments->where('type', 'lesson')->pluck('lesson_id')->all();
-        $enrolledNoteIds    = Enrollment::where('student_id', $student->id)
+        $enrolledLessonIds = $enrollments->where('type', 'lesson')->pluck('lesson_id')->all();
+        $enrolledNoteIds = Enrollment::where('student_id', $student->id)
             ->where('type', 'attachment')->where('active', true)->pluck('note_id')->all();
 
         // ----- Course summary -----
         $totalMinutes = $course->lessons->sum('duration');
 
         $courseData = [
-            'id'                    => $course->id,
-            'title'                 => $course->title,
-            'description'           => $course->description,
-            'image'                 => $course->image,
-            'price'                 => $course->price,
-            'rating'                => $course->rating,
-            'reviews_count'         => $course->reviews_count,
-            'students_count'        => $course->students_count,
-            'allow_section_purchase'=> $course->allow_section_purchase,
+            'id' => $course->id,
+            'title' => $course->title,
+            'description' => $course->description,
+            'image' => $course->image,
+            'price' => $course->price,
+            'rating' => $course->rating,
+            'reviews_count' => $course->reviews_count,
+            'students_count' => $course->students_count,
+            'allow_section_purchase' => $course->allow_section_purchase,
             'allow_lesson_purchase' => $course->allow_lesson_purchase,
-            'sections_count'        => $course->sections->count(),
-            'lessons_count'         => $course->lessons->count(),
-            'total_hours'           => round($totalMinutes / 60, 1),
-            'subject'               => $course->subject,
+            'sections_count' => $course->sections->count(),
+            'lessons_count' => $course->lessons->count(),
+            'total_hours' => round($totalMinutes / 60, 1),
+            'subject' => $course->subject,
         ];
 
         // ----- Instructor -----
         $instructor = null;
         if ($course->instructor) {
             $instructor = [
-                'id'        => $course->instructor->id,
+                'id' => $course->instructor->id,
                 'full_name' => $course->instructor->full_name,
-                'image'     => $course->instructor->image,
+                'image' => $course->instructor->image,
                 'specialty' => $course->instructor->specialty,
-                'bio'       => $course->instructor->bio,
-                'phone'     => $course->instructor->phone,
+                'bio' => $course->instructor->bio,
+                'phone' => $course->instructor->phone,
             ];
         }
 
@@ -209,32 +209,32 @@ class CourseController extends Controller
                     || in_array($lesson->id, $enrolledLessonIds);
 
                 return [
-                    'id'                 => $lesson->id,
-                    'title'              => $lesson->title,
-                    'description'        => $lesson->description,
-                    'thumbnail'          => $lesson->thumbnail,
-                    'duration'           => $lesson->duration,
-                    'order'              => $lesson->order,
-                    'price'              => $lesson->price,
-                    'is_free'            => $lesson->is_free,
-                    'can_download'       => $lesson->can_download,
+                    'id' => $lesson->id,
+                    'title' => $lesson->title,
+                    'description' => $lesson->description,
+                    'thumbnail' => $lesson->thumbnail,
+                    'duration' => $lesson->duration,
+                    'order' => $lesson->order,
+                    'price' => $lesson->price,
+                    'is_free' => $lesson->is_free,
+                    'can_download' => $lesson->can_download,
                     'can_purchase_alone' => (bool) $course->allow_lesson_purchase,
-                    'is_accessible'      => $lessonAccessible,
-                    'video_provider'     => $lesson->video_provider,
+                    'is_accessible' => $lessonAccessible,
+                    'video_provider' => $lesson->video_provider,
                     // Only expose playback URL if student has access
                     'video_playback_url' => $lessonAccessible ? $lesson->video_playback_url : null,
                 ];
             });
 
             return [
-                'id'                 => $section->id,
-                'title'              => $section->title,
-                'description'        => $section->description,
-                'order'              => $section->order,
-                'price'              => $section->price,
+                'id' => $section->id,
+                'title' => $section->title,
+                'description' => $section->description,
+                'order' => $section->order,
+                'price' => $section->price,
                 'can_purchase_alone' => (bool) $course->allow_section_purchase,
-                'is_accessible'      => $sectionAccessible,
-                'lessons'            => $lessons,
+                'is_accessible' => $sectionAccessible,
+                'lessons' => $lessons,
             ];
         });
 
@@ -252,18 +252,18 @@ class CourseController extends Controller
             }
 
             $attachments[] = [
-                'id'                 => $note->id,
-                'title'              => $note->title,
-                'description'        => $note->description,
-                'file_name'          => $note->file_name,
-                'file_type'          => $note->file_type,
-                'file_size'          => $note->file_size,
-                'price'              => $note->price,
-                'is_free'            => $note->is_free,
-                'prevent_download'   => $note->prevent_download,
-                'can_purchase_alone' => !$note->is_free && $note->price > 0,
-                'is_accessible'      => $noteAccessible,
-                'file_url'           => $fileUrl,
+                'id' => $note->id,
+                'title' => $note->title,
+                'description' => $note->description,
+                'file_name' => $note->file_name,
+                'file_type' => $note->file_type,
+                'file_size' => $note->file_size,
+                'price' => $note->price,
+                'is_free' => $note->is_free,
+                'prevent_download' => $note->prevent_download,
+                'can_purchase_alone' => ! $note->is_free && $note->price > 0,
+                'is_accessible' => $noteAccessible,
+                'file_url' => $fileUrl,
             ];
         }
 
@@ -271,33 +271,30 @@ class CourseController extends Controller
         $exams = [];
         if ($hasFullCourse) {
             foreach ($course->exams as $exam) {
+                $fileUrl = null;
+                if ($exam->attachment) {
+                    $fileUrl = filter_var($exam->attachment, FILTER_VALIDATE_URL)
+                        ? $exam->attachment
+                        : Storage::disk('public')->url($exam->attachment);
+                }
                 $exams[] = [
-                    'id'              => $exam->id,
-                    'title'           => $exam->title,
-                    'description'     => $exam->description,
-                    'attachment'      => $exam->attachment,
-                    'duration'        => $exam->duration,
-                    'available_from'  => $exam->available_from?->toDateTimeString(),
+                    'id' => $exam->id,
+                    'title' => $exam->title,
+                    'description' => $exam->description,
+                    'attachment_url' => $fileUrl,
+                    'available_from' => $exam->available_from?->toDateTimeString(),
                     'available_until' => $exam->available_until?->toDateTimeString(),
-                    'questions'       => $exam->questions->map(fn ($q) => [
-                        'id'       => $q->id,
-                        'question' => $q->question,
-                        'type'     => $q->type,
-                        'options'  => $q->options,
-                        'points'   => $q->points,
-                        'order'    => $q->order,
-                    ]),
                 ];
             }
         }
 
         return response()->json([
-            'course'       => $courseData,
-            'instructor'   => $instructor,
-            'is_enrolled'  => $hasFullCourse,
-            'sections'     => $sections,
-            'attachments'  => $attachments,
-            'exams'        => $exams,
+            'course' => $courseData,
+            'instructor' => $instructor,
+            'is_enrolled' => $hasFullCourse,
+            'sections' => $sections,
+            'attachments' => $attachments,
+            'exams' => $exams,
         ]);
     }
 
@@ -328,7 +325,7 @@ class CourseController extends Controller
         $query = Course::approvedForStudents()->with(['instructor', 'subject']);
 
         if ($request->has('keyword')) {
-            $query->where('title', 'like', '%' . $request->keyword . '%');
+            $query->where('title', 'like', '%'.$request->keyword.'%');
         }
 
         if ($request->has('department_id')) {

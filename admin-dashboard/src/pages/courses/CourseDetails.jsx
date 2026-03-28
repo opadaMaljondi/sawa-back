@@ -5,7 +5,9 @@ import { Video } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import Modal from '../../components/common/Modal';
 import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 const CourseDetails = () => {
   const { t } = useTranslation();
@@ -73,17 +75,25 @@ const CourseDetails = () => {
   const [noteError, setNoteError] = useState('');
   const [noteActionLoading, setNoteActionLoading] = useState(false);
 
-  // Exams states
+  // Exams: title + description + file attachment
   const [exams, setExams] = useState([]);
-  const [examsLoading, setExamsLoading] = useState(false);
   const [examModalOpen, setExamModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState(null);
-  const [examForm, setExamForm] = useState({ title: '', description: '', duration: 30 });
-  const [examQuestions, setExamQuestions] = useState([
-    { question: '', type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', points: 5 }
-  ]);
+  const [examForm, setExamForm] = useState({ title: '', description: '' });
+  const [examFile, setExamFile] = useState(null);
   const [examError, setExamError] = useState('');
   const [examActionLoading, setExamActionLoading] = useState(false);
+
+  /** Course enrollments with admin / teacher split */
+  const [subscriptionsPage, setSubscriptionsPage] = useState(1);
+  const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
+  const [subscriptionsData, setSubscriptionsData] = useState([]);
+  const [subscriptionsSummary, setSubscriptionsSummary] = useState(null);
+  const [subscriptionsMeta, setSubscriptionsMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+  });
 
   const loadCourse = async () => {
     try {
@@ -109,6 +119,40 @@ const CourseDetails = () => {
     loadCourse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const loadSubs = async () => {
+      setSubscriptionsLoading(true);
+      try {
+        const res = await coursesAPI.getSubscriptions(id, {
+          page: subscriptionsPage,
+          per_page: 20,
+        });
+        if (cancelled) return;
+        setSubscriptionsData(res.data || []);
+        setSubscriptionsSummary(res.summary ?? null);
+        setSubscriptionsMeta({
+          current_page: res.current_page ?? 1,
+          last_page: res.last_page ?? 1,
+          total: res.total ?? 0,
+        });
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setSubscriptionsData([]);
+          setSubscriptionsSummary(null);
+        }
+      } finally {
+        if (!cancelled) setSubscriptionsLoading(false);
+      }
+    };
+    loadSubs();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, subscriptionsPage]);
 
   const sections = course?.sections || [];
 
@@ -429,41 +473,19 @@ const CourseDetails = () => {
     }
   };
 
-  // --- Exams Logic ---
-  const addQuestion = () => {
-    setExamQuestions([...examQuestions, { question: '', type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', points: 5 }]);
-  };
-
-  const removeQuestion = (idx) => {
-    setExamQuestions(examQuestions.filter((_, i) => i !== idx));
-  };
-
-  const updateQuestion = (idx, field, value) => {
-    const q = [...examQuestions];
-    q[idx][field] = value;
-    setExamQuestions(q);
-  };
-
-  const updateOption = (qIdx, oIdx, value) => {
-    const q = [...examQuestions];
-    q[qIdx].options[oIdx] = value;
-    setExamQuestions(q);
-  };
-
+  // --- Exams (file + title + description) ---
   const openExamModal = (exam = null) => {
     if (exam) {
       setEditingExam(exam);
       setExamForm({
-        title: exam.title,
+        title: exam.title || '',
         description: exam.description || '',
-        duration: exam.duration || 30
       });
-      setExamQuestions(exam.questions?.length ? exam.questions : [{ question: '', type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', points: 5 }]);
     } else {
       setEditingExam(null);
-      setExamForm({ title: '', description: '', duration: 30 });
-      setExamQuestions([{ question: '', type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', points: 5 }]);
+      setExamForm({ title: '', description: '' });
     }
+    setExamFile(null);
     setExamError('');
     setExamModalOpen(true);
   };
@@ -471,23 +493,46 @@ const CourseDetails = () => {
   const submitExam = async (e) => {
     e.preventDefault();
     setExamError('');
+    if (!editingExam && !examFile) {
+      setExamError('يرجى اختيار ملف للامتحان (PDF, Word, PowerPoint, ZIP).');
+      return;
+    }
     setExamActionLoading(true);
     try {
-      const data = {
-        course_id: id,
-        ...examForm,
-        questions: examQuestions
-      };
       if (editingExam) {
-        await examsAPI.update(editingExam.id, data);
+        if (examFile) {
+          const fd = new FormData();
+          fd.append('title', examForm.title);
+          fd.append('description', examForm.description || '');
+          fd.append('attachment', examFile);
+          await examsAPI.update(editingExam.id, fd);
+        } else {
+          await examsAPI.update(editingExam.id, {
+            title: examForm.title,
+            description: examForm.description || null,
+          });
+        }
       } else {
-        await examsAPI.create(data);
+        const fd = new FormData();
+        fd.append('course_id', id);
+        fd.append('title', examForm.title);
+        fd.append('description', examForm.description || '');
+        fd.append('attachment', examFile);
+        await examsAPI.create(fd);
       }
       setExamModalOpen(false);
       await loadCourse();
     } catch (err) {
       console.error(err);
-      setExamError(err.response?.data?.message || 'فشل حفظ الامتحان');
+      const msg = err.response?.data?.message;
+      const errs = err.response?.data?.errors;
+      setExamError(
+        typeof msg === 'string'
+          ? msg
+          : errs
+            ? Object.values(errs).flat().join(' ')
+            : 'فشل حفظ الامتحان',
+      );
     } finally {
       setExamActionLoading(false);
     }
@@ -559,6 +604,14 @@ const CourseDetails = () => {
               <p className="text-gray-700">{course.price ?? '-'}</p>
             </div>
             <div>
+              <p className="mb-1"><strong>عمولة الإدارة (%):</strong></p>
+              <p className="text-gray-700">
+                {course.admin_commission != null && course.admin_commission !== ''
+                  ? `${course.admin_commission}%`
+                  : '—'}
+              </p>
+            </div>
+            <div>
               <p className="mb-1"><strong>حالة الكورس:</strong></p>
               <span
                 className={`status-badge ${course.status === 'published' ? 'status-active' : 'status-inactive'
@@ -588,6 +641,136 @@ const CourseDetails = () => {
           </div>
         </Card>
       </div>
+
+      <Card title="اشتراكات الطلاب (Subscriptions)">
+        <div className="p-4">
+          <p className="text-xs text-gray-500 mb-3">
+            عرض نوع الاشتراك (كورس كامل، وحدة، درس، أو ملف مرفق) مع تقسيم المبلغ بين الإدارة والأستاذ حسب نسبة عمولة الإدارة للكورس.
+          </p>
+          {subscriptionsLoading ? (
+            <p className="text-sm text-gray-500">جاري تحميل الاشتراكات...</p>
+          ) : (
+            <>
+              {subscriptionsSummary && (
+                <div
+                  className="mb-4 p-3 bg-gray-50 rounded-lg grid gap-3 text-sm"
+                  style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}
+                >
+                  <div>
+                    <p className="text-gray-500 text-xs mb-0.5">عمولة الإدارة (%)</p>
+                    <p className="font-semibold text-gray-900">
+                      {subscriptionsSummary.admin_commission_percent}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs mb-0.5">إجمالي المدفوع (نشط)</p>
+                    <p className="font-semibold text-gray-900">
+                      {Number(subscriptionsSummary.total_final_price).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs mb-0.5">حصة الإدارة</p>
+                    <p className="font-semibold text-emerald-800">
+                      {Number(subscriptionsSummary.total_admin_amount).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs mb-0.5">حصة الأستاذ</p>
+                    <p className="font-semibold text-blue-800">
+                      {Number(subscriptionsSummary.total_teacher_amount).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!subscriptionsData.length ? (
+                <p className="text-sm text-gray-500">لا توجد اشتراكات مسجّلة لهذا الكورس.</p>
+              ) : (
+                <>
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>الطالب</th>
+                          <th>النوع</th>
+                          <th>العنصر</th>
+                          <th>المدفوع</th>
+                          <th>حصة الإدارة</th>
+                          <th>حصة الأستاذ</th>
+                          <th>الحالة</th>
+                          <th>التاريخ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subscriptionsData.map((row) => (
+                          <tr key={row.id}>
+                            <td className="text-xs">
+                              <div className="font-medium">{row.student?.full_name ?? '—'}</div>
+                              <div className="text-gray-500">{row.student?.email ?? ''}</div>
+                            </td>
+                            <td className="text-xs whitespace-nowrap">{row.type_label}</td>
+                            <td className="text-xs max-w-[180px] truncate" title={row.item_title}>
+                              {row.item_title}
+                            </td>
+                            <td className="text-xs font-medium">{Number(row.final_price).toFixed(2)}</td>
+                            <td className="text-xs text-emerald-800">
+                              {Number(row.admin_amount).toFixed(2)}
+                            </td>
+                            <td className="text-xs text-blue-800">
+                              {Number(row.teacher_amount).toFixed(2)}
+                            </td>
+                            <td>
+                              <span
+                                className={`status-badge ${row.active ? 'status-active' : 'status-inactive'}`}
+                              >
+                                {row.active ? 'نشط' : 'موقوف'}
+                              </span>
+                            </td>
+                            <td className="text-xs text-gray-600 whitespace-nowrap">
+                              {row.enrolled_at
+                                ? new Date(row.enrolled_at).toLocaleString('ar-EG')
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {subscriptionsMeta.last_page > 1 && (
+                    <div className="flex justify-between items-center mt-3 text-sm">
+                      <span className="text-gray-500">
+                        صفحة {subscriptionsMeta.current_page} من {subscriptionsMeta.last_page} (إجمالي{' '}
+                        {subscriptionsMeta.total})
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={subscriptionsMeta.current_page <= 1}
+                          onClick={() => setSubscriptionsPage((p) => Math.max(1, p - 1))}
+                        >
+                          السابق
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={subscriptionsMeta.current_page >= subscriptionsMeta.last_page}
+                          onClick={() =>
+                            setSubscriptionsPage((p) =>
+                              Math.min(subscriptionsMeta.last_page, p + 1),
+                            )
+                          }
+                        >
+                          التالي
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </Card>
 
       <Card title="الوحدات">
         <div className="p-4">
@@ -866,19 +1049,27 @@ const CourseDetails = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {notes.map((note) => (
+                    {notes.map((note) => {
+                      const noteFileHref =
+                        resolveMediaUrl(note.file_url) || resolveMediaUrl(note.file_path);
+                      return (
                       <tr key={note.id}>
                         <td>{note.title}</td>
                         <td>{note.file_type?.toUpperCase()}</td>
                         <td>
                           <div className="table-actions">
-                            <a href={note.file_url} target="_blank" rel="noreferrer" className="text-blue-600 text-xs underline">عرض</a>
+                            {noteFileHref ? (
+                              <a href={noteFileHref} target="_blank" rel="noreferrer" className="text-blue-600 text-xs underline">عرض</a>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
                             <Button variant="secondary" size="sm" onClick={() => openNoteModal(note)}>تعديل</Button>
                             <Button variant="danger" size="sm" onClick={() => deleteNote(note.id)}>حذف</Button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -903,17 +1094,27 @@ const CourseDetails = () => {
                   <thead>
                     <tr>
                       <th>العنوان</th>
-                      <th>المدة</th>
-                      <th>الأسئلة</th>
+                      <th>الوصف</th>
+                      <th>الملف</th>
                       <th>الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {exams.map((exam) => (
+                    {exams.map((exam) => {
+                      const fileHref = resolveMediaUrl(exam.attachment_url) || resolveMediaUrl(exam.attachment);
+                      return (
                       <tr key={exam.id}>
-                        <td>{exam.title}</td>
-                        <td>{exam.duration} دقيقة</td>
-                        <td>{(exam.questions || []).length}</td>
+                        <td className="font-medium">{exam.title}</td>
+                        <td className="text-xs text-gray-600 max-w-[200px] truncate">{exam.description || '—'}</td>
+                        <td>
+                          {fileHref ? (
+                            <a href={fileHref} target="_blank" rel="noreferrer" className="text-blue-600 text-xs underline">
+                              تحميل
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td>
                           <div className="table-actions">
                             <Button variant="secondary" size="sm" onClick={() => openExamModal(exam)}>تعديل</Button>
@@ -921,7 +1122,8 @@ const CourseDetails = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -930,80 +1132,75 @@ const CourseDetails = () => {
         </Card>
       </div>
 
-      {/* Section Modal */}
-      {
-        sectionModalOpen && (
-          <div className="modal-backdrop" onClick={() => setSectionModalOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">
-                {editingSection ? 'تعديل وحدة' : 'إضافة وحدة جديدة'}
-              </h3>
-              <form onSubmit={submitSection} className="modal-body">
-                {sectionError && <div className="login-error">{sectionError}</div>}
-                <Input
-                  label="عنوان الوحدة"
-                  value={sectionForm.title}
-                  onChange={(e) =>
-                    setSectionForm((f) => ({ ...f, title: e.target.value }))
-                  }
-                  required
-                  fullWidth
-                />
-                <div>
-                  <label className="input-label">الوصف</label>
-                  <textarea
-                    className="input-field"
-                    rows={2}
-                    value={sectionForm.description}
-                    onChange={(e) =>
-                      setSectionForm((f) => ({ ...f, description: e.target.value }))
-                    }
-                  />
-                </div>
-                <Input
-                  label="الترتيب"
-                  type="number"
-                  value={sectionForm.order}
-                  onChange={(e) =>
-                    setSectionForm((f) => ({ ...f, order: e.target.value }))
-                  }
-                  fullWidth
-                />
-                <Input
-                  label="سعر الوحدة (اختياري)"
-                  type="number"
-                  value={sectionForm.price}
-                  onChange={(e) =>
-                    setSectionForm((f) => ({ ...f, price: e.target.value }))
-                  }
-                  fullWidth
-                />
-                <div className="modal-actions">
-                  <Button type="submit" variant="primary">
-                    حفظ
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setSectionModalOpen(false)}
-                  >
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
-            </div>
+      <Modal
+        isOpen={sectionModalOpen}
+        onClose={() => setSectionModalOpen(false)}
+        title={editingSection ? 'تعديل وحدة' : 'إضافة وحدة جديدة'}
+        size="md"
+      >
+        <form onSubmit={submitSection} className="space-y-4">
+          {sectionError && <div className="login-error">{sectionError}</div>}
+          <Input
+            label="عنوان الوحدة"
+            value={sectionForm.title}
+            onChange={(e) =>
+              setSectionForm((f) => ({ ...f, title: e.target.value }))
+            }
+            required
+            fullWidth
+          />
+          <div>
+            <label className="input-label">الوصف</label>
+            <textarea
+              className="input-field"
+              rows={2}
+              value={sectionForm.description}
+              onChange={(e) =>
+                setSectionForm((f) => ({ ...f, description: e.target.value }))
+              }
+            />
           </div>
-        )
-      }
+          <Input
+            label="الترتيب"
+            type="number"
+            value={sectionForm.order}
+            onChange={(e) =>
+              setSectionForm((f) => ({ ...f, order: e.target.value }))
+            }
+            fullWidth
+          />
+          <Input
+            label="سعر الوحدة (اختياري)"
+            type="number"
+            value={sectionForm.price}
+            onChange={(e) =>
+              setSectionForm((f) => ({ ...f, price: e.target.value }))
+            }
+            fullWidth
+          />
+          <div className="modal-form-actions">
+            <Button type="submit" variant="primary">
+              حفظ
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSectionModalOpen(false)}
+            >
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-      {/* Add Lesson Modal */}
-      {
-        lessonModalOpen && (
-          <div className="modal-backdrop" onClick={() => setLessonModalOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">إضافة درس / فيديو</h3>
-              <form onSubmit={submitLesson} className="modal-body">
-                {lessonError && <div className="login-error">{lessonError}</div>}
+      <Modal
+        isOpen={lessonModalOpen}
+        onClose={() => !lessonLoading && setLessonModalOpen(false)}
+        title="إضافة درس / فيديو"
+        size="xl"
+      >
+        <form onSubmit={submitLesson} className="space-y-4">
+          {lessonError && <div className="login-error">{lessonError}</div>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="عنوان الدرس"
@@ -1161,44 +1358,41 @@ const CourseDetails = () => {
                   </div>
                 </div>
 
-                {lessonLoading && uploadProgress > 0 && (
-                  <div style={{ margin: '8px 0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                      <span>جاري الرفع...</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8, overflow: 'hidden' }}>
-                      <div style={{ background: '#3b82f6', width: `${uploadProgress}%`, height: '100%', transition: 'width 0.3s' }} />
-                    </div>
-                  </div>
-                )}
-                <div className="modal-actions">
-                  <Button type="submit" variant="primary" loading={lessonLoading}>
-                    حفظ ورفع
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setLessonModalOpen(false)}
-                    disabled={lessonLoading}
-                  >
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
+          {lessonLoading && uploadProgress > 0 && (
+            <div style={{ margin: '8px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                <span>جاري الرفع...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8, overflow: 'hidden' }}>
+                <div style={{ background: '#3b82f6', width: `${uploadProgress}%`, height: '100%', transition: 'width 0.3s' }} />
+              </div>
             </div>
+          )}
+          <div className="modal-form-actions">
+            <Button type="submit" variant="primary" loading={lessonLoading}>
+              حفظ ورفع
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLessonModalOpen(false)}
+              disabled={lessonLoading}
+            >
+              إلغاء
+            </Button>
           </div>
-        )
-      }
+        </form>
+      </Modal>
 
-      {/* Edit Lesson Modal */}
-      {
-        editLessonModalOpen && (
-          <div className="modal-backdrop" onClick={() => setEditLessonModalOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">تعديل الدرس</h3>
-              <form onSubmit={submitEditLesson} className="modal-body">
-                {editLessonError && <div className="login-error">{editLessonError}</div>}
+      <Modal
+        isOpen={editLessonModalOpen}
+        onClose={() => !editLessonLoading && setEditLessonModalOpen(false)}
+        title="تعديل الدرس"
+        size="xl"
+      >
+        <form onSubmit={submitEditLesson} className="space-y-4">
+          {editLessonError && <div className="login-error">{editLessonError}</div>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="العنوان"
@@ -1350,33 +1544,30 @@ const CourseDetails = () => {
                   </select>
                 </div>
 
-                <div className="modal-actions">
-                  <Button type="submit" variant="primary" loading={editLessonLoading}>
-                    حفظ
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditLessonModalOpen(false)}
-                    disabled={editLessonLoading}
-                  >
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div >
-        )
-      }
+          <div className="modal-form-actions">
+            <Button type="submit" variant="primary" loading={editLessonLoading}>
+              حفظ
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditLessonModalOpen(false)}
+              disabled={editLessonLoading}
+            >
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-      {/* Note Modal */}
-      {
-        noteModalOpen && (
-          <div className="modal-backdrop" onClick={() => setNoteModalOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">{editingNote ? 'تعديل ملف' : 'إضافة ملف مرفق'}</h3>
-              <form onSubmit={submitNote} className="modal-body">
-                {noteError && <div className="login-error">{noteError}</div>}
+      <Modal
+        isOpen={noteModalOpen}
+        onClose={() => !noteActionLoading && setNoteModalOpen(false)}
+        title={editingNote ? 'تعديل ملف' : 'إضافة ملف مرفق'}
+        size="md"
+      >
+        <form onSubmit={submitNote} className="space-y-4">
+          {noteError && <div className="login-error">{noteError}</div>}
                 <Input
                   label="عنوان الملف"
                   value={noteForm.title}
@@ -1443,144 +1634,66 @@ const CourseDetails = () => {
                     </label>
                   </div>
                 )}
-                <div className="modal-actions">
-                  <Button type="submit" variant="primary" loading={noteActionLoading}>
-                    {editingNote ? 'حفظ' : 'رفع الملف'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setNoteModalOpen(false)}>
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
-            </div>
+          <div className="modal-form-actions">
+            <Button type="submit" variant="primary" loading={noteActionLoading}>
+              {editingNote ? 'حفظ' : 'رفع الملف'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setNoteModalOpen(false)}>
+              إلغاء
+            </Button>
           </div>
-        )
-      }
+        </form>
+      </Modal>
 
-      {/* Exam Modal */}
-      {
-        examModalOpen && (
-          <div className="modal-backdrop" onClick={() => setExamModalOpen(false)}>
-            <div className="modal" style={{ maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">{editingExam ? 'تعديل امتحان' : 'إنشاء امتحان جديد'}</h3>
-              <form onSubmit={submitExam} className="modal-body">
-                {examError && <div className="login-error">{examError}</div>}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="عنوان الامتحان"
-                    value={examForm.title}
-                    onChange={(e) => setExamForm(f => ({ ...f, title: e.target.value }))}
-                    required
-                    fullWidth
-                  />
-                  <Input
-                    label="المدة (بالدقائق)"
-                    type="number"
-                    value={examForm.duration}
-                    onChange={(e) => setExamForm(f => ({ ...f, duration: e.target.value }))}
-                    required
-                    fullWidth
-                  />
-                </div>
-                <div>
-                  <label className="input-label">وصف الامتحان (اختياري)</label>
-                  <textarea
-                    className="input-field"
-                    rows={2}
-                    value={examForm.description}
-                    onChange={(e) => setExamForm(f => ({ ...f, description: e.target.value }))}
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium text-sm">الأسئلة ({examQuestions.length})</h4>
-                    <Button type="button" variant="outline" size="sm" onClick={addQuestion}>+ إضافة سؤال</Button>
-                  </div>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto p-2 border border-gray-100 rounded">
-                    {examQuestions.map((q, qIdx) => (
-                      <div key={qIdx} className="p-3 border rounded bg-gray-50 relative">
-                        <button
-                          type="button"
-                          className="absolute top-2 left-2 text-red-500 hover:text-red-700"
-                          onClick={() => removeQuestion(qIdx)}
-                        >
-                          حذف
-                        </button>
-                        <div className="grid grid-cols-1 gap-2">
-                          <Input
-                            label={`سؤال ${qIdx + 1}`}
-                            value={q.question}
-                            onChange={(e) => updateQuestion(qIdx, 'question', e.target.value)}
-                            required
-                            fullWidth
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs text-gray-500">نوع السؤال</label>
-                              <select
-                                className="input-field text-sm"
-                                value={q.type}
-                                onChange={(e) => updateQuestion(qIdx, 'type', e.target.value)}
-                              >
-                                <option value="multiple_choice">اختيار من متعدد</option>
-                                <option value="true_false">صح أو خطأ</option>
-                              </select>
-                            </div>
-                            <Input
-                              label="النقاط"
-                              type="number"
-                              size="sm"
-                              value={q.points}
-                              onChange={(e) => updateQuestion(qIdx, 'points', e.target.value)}
-                              required
-                            />
-                          </div>
-
-                          {q.type === 'multiple_choice' && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              {q.options.map((opt, oIdx) => (
-                                <Input
-                                  key={oIdx}
-                                  label={`خيار ${oIdx + 1}`}
-                                  value={opt}
-                                  onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
-                                  required
-                                  size="sm"
-                                />
-                              ))}
-                            </div>
-                          )}
-
-                          <Input
-                            label="الإجابة الصحيحة"
-                            placeholder={q.type === 'true_false' ? 'true / false' : 'اكتب النص المطابق تماما'}
-                            value={q.correct_answer}
-                            onChange={(e) => updateQuestion(qIdx, 'correct_answer', e.target.value)}
-                            required
-                            fullWidth
-                            size="sm"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="modal-actions mt-4">
-                  <Button type="submit" variant="primary" loading={examActionLoading}>
-                    {editingExam ? 'حفظ' : 'إنشاء الامتحان'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setExamModalOpen(false)}>
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
-            </div>
+      <Modal
+        isOpen={examModalOpen}
+        onClose={() => !examActionLoading && setExamModalOpen(false)}
+        title={editingExam ? 'تعديل امتحان' : 'إنشاء امتحان جديد'}
+        size="md"
+      >
+        <form onSubmit={submitExam} className="space-y-4">
+          {examError && <div className="login-error">{examError}</div>}
+          <Input
+            label="عنوان الامتحان"
+            value={examForm.title}
+            onChange={(e) => setExamForm((f) => ({ ...f, title: e.target.value }))}
+            required
+            fullWidth
+          />
+          <div>
+            <label className="input-label">الوصف (اختياري)</label>
+            <textarea
+              className="input-field"
+              rows={3}
+              value={examForm.description}
+              onChange={(e) => setExamForm((f) => ({ ...f, description: e.target.value }))}
+            />
           </div>
-        )
-      }
-    </div >
+          <div>
+            <label className="input-label">
+              {editingExam ? 'ملف الامتحان (اتركه فارغاً للإبقاء على الملف الحالي)' : 'ملف الامتحان'}
+            </label>
+            <input
+              type="file"
+              className="input-field"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,application/pdf,application/zip"
+              onChange={(e) => setExamFile(e.target.files?.[0] || null)}
+              required={!editingExam}
+            />
+            <p className="text-xs text-gray-500 mt-1">PDF, Word, PowerPoint أو ZIP — بحد أقصى 10 ميجابايت</p>
+          </div>
+
+          <div className="modal-form-actions mt-4">
+            <Button type="submit" variant="primary" loading={examActionLoading}>
+              {editingExam ? 'حفظ' : 'إنشاء الامتحان'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setExamModalOpen(false)}>
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
   );
 };
 

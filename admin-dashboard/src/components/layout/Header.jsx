@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -17,7 +17,8 @@ import {
     Clock,
     Check,
     CheckCircle2,
-    Loader2
+    Loader2,
+    QrCode
 } from 'lucide-react';
 import { notificationsAPI } from '../../services/api';
 import './Header.css';
@@ -126,6 +127,14 @@ const Header = ({ onMenuClick }) => {
             </div>
 
             <div className="header-right">
+                <Link
+                    to="/scan-wallet"
+                    className={`header-icon-btn ${location.pathname === '/scan-wallet' ? 'active' : ''}`}
+                    title={t('students.scanWalletQr')}
+                >
+                    <QrCode size={20} />
+                </Link>
+
                 <button
                     className="header-icon-btn"
                     onClick={toggleTheme}
@@ -238,6 +247,7 @@ const Header = ({ onMenuClick }) => {
                     )}
                 </div>
             </div>
+
         </header>
     );
 };

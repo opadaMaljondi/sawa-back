@@ -5,6 +5,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { notesAPI, coursesAPI } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 const NotesList = () => {
     const { t } = useTranslation();
@@ -200,7 +201,10 @@ const NotesList = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredNotes.map((note) => (
+                                {filteredNotes.map((note) => {
+                                    const noteFileHref =
+                                        resolveMediaUrl(note.file_url) || resolveMediaUrl(note.file_path);
+                                    return (
                                     <tr key={note.id}>
                                         <td>
                                             <div className="flex items-center gap-2">
@@ -218,8 +222,9 @@ const NotesList = () => {
                                         </td>
                                         <td>
                                             <div className="table-actions">
+                                                {noteFileHref ? (
                                                 <a
-                                                    href={note.file_url}
+                                                    href={noteFileHref}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="action-btn flex items-center gap-1"
@@ -228,6 +233,9 @@ const NotesList = () => {
                                                 >
                                                     <ExternalLink size={14} /> عرض
                                                 </a>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
                                                 <button
                                                     className="action-btn flex items-center gap-1"
                                                     style={{ color: 'var(--color-secondary-600)' }}
@@ -246,7 +254,8 @@ const NotesList = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

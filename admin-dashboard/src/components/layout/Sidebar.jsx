@@ -14,9 +14,10 @@ import {
     Settings,
     Bell,
     Image as ImageIcon,
-    FileText,
+    Tag,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Wallet
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -30,6 +31,13 @@ const Sidebar = ({ collapsed, onToggle }) => {
         { path: '/courses', icon: BookOpen, label: t('nav.courses') },
         { path: '/permissions', icon: Shield, label: t('nav.permissions') },
         { path: '/subscriptions', icon: CreditCard, label: t('nav.subscriptions') },
+        {
+            label: t('nav.finance'),
+            icon: Wallet,
+            children: [
+                { path: '/finance', icon: Wallet, label: t('nav.financeCenter') },
+            ]
+        },
         { path: '/banners', icon: ImageIcon, label: t('banners.title') || 'البانرات' },
         {
             label: t('nav.academic'),
@@ -42,7 +50,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
             ]
         },
         { path: '/notifications', icon: Bell, label: t('common.notifications') },
-        { path: '/notes', icon: FileText, label: 'إدارة الملفات' },
+        { path: '/coupons', icon: Tag, label: t('nav.coupons') },
         { path: '/settings', icon: Settings, label: t('nav.settings') }
     ];
 

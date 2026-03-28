@@ -8,7 +8,7 @@ const storageURL = import.meta.env.VITE_STORAGE_URL || baseURL.replace('/api', '
 // Create axios instance with default config
 const api = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 25000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -46,27 +46,76 @@ export const dashboardAPI = {
   stats: () => api.get('/admin/dashboard/stats'),
   topCourses: () => api.get('/admin/dashboard/top-courses'),
   recentEnrollments: () => api.get('/admin/dashboard/recent-enrollments'),
+  couponStats: () => api.get('/admin/dashboard/coupon-stats'),
 };
 
 // Students (Admin\StudentController @ /api/admin/students)
 export const studentsAPI = {
   getAll: (params) => api.get('/admin/students', { params }),
   getById: (id) => api.get(`/admin/students/${id}`),
-  create: (data) => api.post('/admin/students', data),
-  update: (id, data) => api.put(`/admin/students/${id}`, data),
+  /** Lightweight profile for wallet QR scan page (no enrollments). */
+  walletQrPreview: (id) => api.get(`/admin/students/${id}/wallet-qr-preview`),
+  create: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/admin/students', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/admin/students', data);
+  },
+  update: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/admin/students/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/admin/students/${id}`, data);
+  },
   enroll: (id, data) => api.post(`/admin/students/${id}/enroll`, data),
   updateWallet: (id, data) => api.post(`/admin/students/${id}/wallet`, data),
   toggleBan: (id) => api.post(`/admin/students/${id}/toggle-ban`),
   delete: (id) => api.delete(`/admin/students/${id}`),
 };
 
+// Wallets (Admin\WalletController)
+export const walletsAPI = {
+  list: (params) => api.get('/admin/wallets', { params }),
+  transactions: (params) => api.get('/admin/wallets/transactions', { params }),
+  show: (userId) => api.get(`/admin/wallets/${userId}`),
+  adjust: (userId, data) => api.post(`/admin/wallets/${userId}/adjust`, data),
+};
+
+// Finance aggregates (Admin\FinanceController)
+export const financeAPI = {
+  getPlatformTotals: () => api.get('/admin/finance/platform-totals'),
+};
+
 // Instructors (teachers) (Admin\InstructorController @ /api/admin/instructors)
 export const teachersAPI = {
   getAll: (params) => api.get('/admin/instructors', { params }),
+  getFinanceSummary: (params) => api.get('/admin/instructors/finance-summary', { params }),
   getById: (id) => api.get(`/admin/instructors/${id}`),
-  create: (data) => api.post('/admin/instructors', data),
-  update: (id, data) => api.put(`/admin/instructors/${id}`, data),
+  create: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/admin/instructors', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/admin/instructors', data);
+  },
+  update: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/admin/instructors/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/admin/instructors/${id}`, data);
+  },
   updatePermissions: (id, data) => api.put(`/admin/instructors/${id}/permissions`, data),
+  getWalletOverview: (id) => api.get(`/admin/instructors/${id}/wallet-overview`),
+  updateWallet: (id, data) => api.post(`/admin/instructors/${id}/wallet`, data),
   toggleSuspend: (id) => api.post(`/admin/instructors/${id}/toggle-suspend`),
   createCourse: (id, data) => api.post(`/admin/instructors/${id}/courses`, data),
   delete: (id) => api.delete(`/admin/instructors/${id}`),
@@ -99,6 +148,8 @@ export const coursesAPI = {
   suspend: (id) => api.post(`/admin/courses/${id}/suspend`),
   activate: (id) => api.post(`/admin/courses/${id}/activate`),
   stats: (id) => api.get(`/admin/courses/${id}/stats`),
+  getSubscriptions: (id, params) =>
+    api.get(`/admin/courses/${id}/subscriptions`, { params }),
   makeFirstFree: (id) => api.post(`/admin/courses/${id}/make-first-free`),
 };
 
@@ -222,6 +273,14 @@ export const notificationsAPI = {
   markAsRead: (id) => api.post(`/admin/notifications/${id}/read`),
 };
 
+// Coupons (admin)
+export const couponsAPI = {
+  list: (params) => api.get('/admin/coupons', { params }),
+  create: (data) => api.post('/admin/coupons', data),
+  update: (id, data) => api.put(`/admin/coupons/${id}`, data),
+  delete: (id) => api.delete(`/admin/coupons/${id}`),
+};
+
 // Notes / Files
 export const notesAPI = {
   listAll: () => api.get('/admin/notes'),
@@ -233,11 +292,26 @@ export const notesAPI = {
   delete: (id) => api.delete(`/admin/notes/${id}`),
 };
 
-// Exams
+// Exams (multipart: title, description, attachment file)
 export const examsAPI = {
   getAll: (courseId) => api.get(`/admin/courses/${courseId}/exams`),
-  create: (data) => api.post('/admin/exams', data),
-  update: (id, data) => api.put(`/admin/exams/${id}`, data),
+  create: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/admin/exams', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/admin/exams', data);
+  },
+  update: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/admin/exams/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/admin/exams/${id}`, data);
+  },
   delete: (id) => api.delete(`/admin/exams/${id}`),
 };
 

@@ -8,6 +8,17 @@ import { settingsAPI } from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import './SettingsPage.css';
 
+/** Must match backend Setting::KEYS_META */
+const ALLOWED_SETTING_KEYS = [
+    'site_name',
+    'site_description',
+    'contact_email',
+    'contact_phone',
+    'address',
+    'maintenance_mode',
+    'allow_registration',
+];
+
 const SettingsPage = () => {
     const { t } = useTranslation();
     const { theme, changeTheme } = useTheme();
@@ -52,11 +63,10 @@ const SettingsPage = () => {
             setSaving(true);
             setMessage({ type: '', text: '' });
 
-            // Format for API
-            const settingsToUpdate = Object.keys(formData).map(key => ({
-                key,
-                value: formData[key]
-            }));
+            // Only send known keys (avoids stray keys; matches server whitelist)
+            const settingsToUpdate = ALLOWED_SETTING_KEYS.filter((key) =>
+                Object.prototype.hasOwnProperty.call(formData, key)
+            ).map((key) => ({ key, value: formData[key] }));
 
             await settingsAPI.update({ settings: settingsToUpdate });
             setMessage({ type: 'success', text: 'تم حفظ الإعدادات بنجاح' });

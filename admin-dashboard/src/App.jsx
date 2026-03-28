@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -24,10 +24,23 @@ import SettingsPage from './pages/settings/SettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import BannersPage from './pages/banners/Banners';
-import NotesList from './pages/notes/NotesList';
+import CouponManagement from './pages/coupons/CouponManagement';
 import RolesAndPermissions from './pages/permissions/RolesAndPermissions';
+import FinanceManagement from './pages/finance/FinanceManagement';
+import WalletQrScanPage from './pages/wallet/WalletQrScanPage';
 import Login from './pages/auth/Login';
 import './assets/styles/index.css';
+
+/** Remount when :id changes so course-level state (e.g. subscriptions page) resets */
+function CourseDetailsRoute() {
+  const { id } = useParams();
+  return <CourseDetails key={id} />;
+}
+
+function TeacherDetailsRoute() {
+  const { id } = useParams();
+  return <TeacherDetails key={id} />;
+}
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -76,18 +89,20 @@ function App() {
                 <Route path="students/:id/edit" element={<StudentForm />} />
                 <Route path="teachers" element={<TeachersList />} />
                 <Route path="teachers/new" element={<TeacherForm />} />
-                <Route path="teachers/:id" element={<TeacherDetails />} />
+                <Route path="teachers/:id" element={<TeacherDetailsRoute />} />
                 <Route path="teachers/:id/edit" element={<TeacherForm />} />
                 <Route path="courses" element={<CoursesList />} />
                 <Route path="courses/new" element={<CourseForm />} />
-                <Route path="courses/:id" element={<CourseDetails />} />
+                <Route path="courses/:id" element={<CourseDetailsRoute />} />
                 <Route path="courses/:id/edit" element={<CourseForm />} />
-                <Route path="notes" element={<NotesList />} />
+                <Route path="coupons" element={<CouponManagement />} />
                 <Route path="courses/:courseId/lessons/:lessonId" element={<VideoPlayer />} />
 
                 {/* Academic structure */}
                 <Route path="permissions" element={<RolesAndPermissions />} />
                 <Route path="subscriptions" element={<SubscriptionsList />} />
+                <Route path="finance" element={<FinanceManagement />} />
+                <Route path="scan-wallet" element={<WalletQrScanPage />} />
                 <Route path="academic/departments" element={<DepartmentsPage />} />
                 <Route path="academic/years" element={<YearsPage />} />
                 <Route path="academic/semesters" element={<SemestersPage />} />

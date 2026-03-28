@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api\Instructor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
-use App\Models\Subject;
+use App\Models\Enrollment;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CourseController extends Controller
 {
@@ -27,11 +30,15 @@ class CourseController extends Controller
      */
     public function store(Request $request)
     {
+        $imageRule = $request->hasFile('image')
+            ? ['nullable', 'image', 'max:5120']
+            : ['nullable', 'string', 'max:500'];
+
         $request->validate([
             'subject_id' => 'required|exists:subjects,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $imageRule,
             'price' => 'required|numeric|min:0',
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
@@ -40,8 +47,15 @@ class CourseController extends Controller
 
         // التحقق من الصلاحيات
         $instructor = auth()->user();
-        if (!$instructor->hasPermissionTo('create course')) {
+        if (! $instructor->hasPermissionTo('create course')) {
             return response()->json(['message' => 'Permission denied'], 403);
+        }
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('courses', 'public');
+        } elseif ($request->filled('image')) {
+            $imagePath = $request->input('image');
         }
 
         $course = Course::create([
@@ -49,7 +63,7 @@ class CourseController extends Controller
             'instructor_id' => auth()->id(),
             'title' => $request->title,
             'description' => $request->description,
-            'image' => $request->image,
+            'image' => $imagePath,
             'price' => $request->price,
             'allow_section_purchase' => $request->boolean('allow_section_purchase', false),
             'allow_lesson_purchase' => $request->boolean('allow_lesson_purchase', false),
@@ -59,8 +73,8 @@ class CourseController extends Controller
         ]);
 
         // إرسال إشعار للآدمن
-        $notificationService = app(\App\Services\NotificationService::class);
-        $adminIds = \App\Models\User::where('type', 'admin')->pluck('id')->toArray();
+        $notificationService = app(NotificationService::class);
+        $adminIds = User::where('type', 'admin')->pluck('id')->toArray();
         foreach ($adminIds as $adminId) {
             $notificationService->sendToUser(
                 $adminId,
@@ -85,24 +99,40 @@ class CourseController extends Controller
             ->findOrFail($courseId);
 
         // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('edit course')) {
+        if (! auth()->user()->hasPermissionTo('edit course')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
+
+        $imageRule = $request->hasFile('image')
+            ? ['nullable', 'image', 'max:5120']
+            : ['nullable', 'string', 'max:500'];
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $imageRule,
             'price' => 'sometimes|numeric|min:0',
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
             'free_first_lesson' => 'boolean',
         ]);
 
-        $course->update($request->only([
-            'title', 'description', 'image', 'price',
+        $data = $request->only([
+            'title', 'description', 'price',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
-        ]));
+        ]);
+
+        if ($request->hasFile('image')) {
+            $oldPath = $course->getRawOriginal('image');
+            if ($oldPath && ! filter_var($oldPath, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+            $data['image'] = $request->file('image')->store('courses', 'public');
+        } elseif ($request->has('image') && is_string($request->input('image'))) {
+            $data['image'] = $request->input('image');
+        }
+
+        $course->update($data);
 
         return response()->json([
             'message' => 'Course updated successfully',
@@ -118,7 +148,7 @@ class CourseController extends Controller
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($courseId);
 
-        $enrollments = \App\Models\Enrollment::where('course_id', $courseId)
+        $enrollments = Enrollment::where('course_id', $courseId)
             ->where('active', true)
             ->get();
 

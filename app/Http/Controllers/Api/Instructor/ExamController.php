@@ -3,22 +3,22 @@
 namespace App\Http\Controllers\Api\Instructor;
 
 use App\Http\Controllers\Controller;
-use App\Models\Exam;
 use App\Models\Course;
+use App\Models\Exam;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ExamController extends Controller
 {
     /**
-     * Get exams for a course
+     * Get exams for a course.
      */
     public function index($courseId)
     {
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($courseId);
 
-        $exams = Exam::where('course_id', $courseId)
-            ->with(['questions'])
+        $exams = Exam::where('course_id', $course->id)
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -26,12 +26,11 @@ class ExamController extends Controller
     }
 
     /**
-     * Create exam
+     * Create exam (file + title + description).
      */
     public function store(Request $request)
     {
-        // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('publish exam')) {
+        if (! auth()->user()->hasPermissionTo('publish exam')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
@@ -39,45 +38,31 @@ class ExamController extends Controller
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'duration' => 'required|integer|min:1', // بالدقائق
-            'questions' => 'required|array|min:1',
-            'questions.*.question' => 'required|string',
-            'questions.*.type' => 'required|in:multiple_choice,true_false,short_answer',
-            'questions.*.options' => 'required_if:questions.*.type,multiple_choice|array',
-            'questions.*.correct_answer' => 'required|string',
-            'questions.*.points' => 'required|integer|min:1',
+            'attachment' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,zip|max:10240',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($request->course_id);
 
+        $path = $request->file('attachment')->store('exams', 'public');
+
         $exam = Exam::create([
             'course_id' => $course->id,
             'title' => $request->title,
             'description' => $request->description,
-            'duration' => $request->duration,
-            'is_active' => false, // يحتاج موافقة الأدمن
+            'attachment' => $path,
+            'active' => false,
+            'created_by' => auth()->id(),
         ]);
-
-        // إنشاء الأسئلة
-        foreach ($request->questions as $questionData) {
-            $exam->questions()->create([
-                'question' => $questionData['question'],
-                'type' => $questionData['type'],
-                'options' => $questionData['options'] ?? null,
-                'correct_answer' => $questionData['correct_answer'],
-                'points' => $questionData['points'],
-            ]);
-        }
 
         return response()->json([
             'message' => 'Exam created successfully. Waiting for admin approval.',
-            'exam' => $exam->load('questions'),
+            'exam' => $exam,
         ], 201);
     }
 
     /**
-     * Update exam
+     * Update exam.
      */
     public function update(Request $request, $examId)
     {
@@ -85,27 +70,35 @@ class ExamController extends Controller
             $query->where('instructor_id', auth()->id());
         })->findOrFail($examId);
 
-        // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('edit exam')) {
+        if (! auth()->user()->hasPermissionTo('edit exam')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'duration' => 'sometimes|integer|min:1',
+            'attachment' => 'nullable|file|mimes:pdf,doc,docx,ppt,pptx,zip|max:10240',
         ]);
 
-        $exam->update($request->only(['title', 'description', 'duration']));
+        $data = $request->only(['title', 'description']);
+
+        if ($request->hasFile('attachment')) {
+            if ($exam->attachment && ! filter_var($exam->attachment, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($exam->attachment);
+            }
+            $data['attachment'] = $request->file('attachment')->store('exams', 'public');
+        }
+
+        $exam->update($data);
 
         return response()->json([
             'message' => 'Exam updated successfully',
-            'exam' => $exam,
+            'exam' => $exam->fresh(),
         ]);
     }
 
     /**
-     * Delete exam
+     * Delete exam.
      */
     public function destroy($examId)
     {
@@ -113,9 +106,12 @@ class ExamController extends Controller
             $query->where('instructor_id', auth()->id());
         })->findOrFail($examId);
 
-        // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('delete exam')) {
+        if (! auth()->user()->hasPermissionTo('delete exam')) {
             return response()->json(['message' => 'Permission denied'], 403);
+        }
+
+        if ($exam->attachment && ! filter_var($exam->attachment, FILTER_VALIDATE_URL)) {
+            Storage::disk('public')->delete($exam->attachment);
         }
 
         $exam->delete();

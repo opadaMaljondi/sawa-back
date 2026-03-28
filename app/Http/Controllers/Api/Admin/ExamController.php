@@ -6,18 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Exam;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ExamController extends Controller
 {
     /**
-     * Get exams for any course
+     * Get exams for any course (title, description, attachment path).
      */
     public function index($courseId)
     {
         Course::findOrFail($courseId);
 
         $exams = Exam::where('course_id', $courseId)
-            ->with(['questions'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -25,7 +25,7 @@ class ExamController extends Controller
     }
 
     /**
-     * Create exam (any course)
+     * Create exam: title, description, file (stored on public disk).
      */
     public function store(Request $request)
     {
@@ -33,44 +33,30 @@ class ExamController extends Controller
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'duration' => 'required|integer|min:1',
-            'questions' => 'required|array|min:1',
-            'questions.*.question' => 'required|string',
-            'questions.*.type' => 'required|in:multiple_choice,true_false,short_answer',
-            'questions.*.options' => 'required_if:questions.*.type,multiple_choice|array',
-            'questions.*.correct_answer' => 'required|string',
-            'questions.*.points' => 'required|integer|min:1',
+            'attachment' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,zip|max:10240',
         ]);
 
         $course = Course::findOrFail($request->course_id);
+
+        $path = $request->file('attachment')->store('exams', 'public');
 
         $exam = Exam::create([
             'course_id' => $course->id,
             'title' => $request->title,
             'description' => $request->description,
-            'duration' => $request->duration,
-            'is_active' => true,
+            'attachment' => $path,
+            'active' => true,
             'created_by' => auth()->id(),
         ]);
 
-        foreach ($request->questions as $questionData) {
-            $exam->questions()->create([
-                'question' => $questionData['question'],
-                'type' => $questionData['type'],
-                'options' => $questionData['options'] ?? null,
-                'correct_answer' => $questionData['correct_answer'],
-                'points' => $questionData['points'],
-            ]);
-        }
-
         return response()->json([
             'message' => 'Exam created successfully',
-            'exam' => $exam->load('questions'),
+            'exam' => $exam,
         ], 201);
     }
 
     /**
-     * Update exam (any exam)
+     * Update exam metadata and optionally replace file.
      */
     public function update(Request $request, $examId)
     {
@@ -79,10 +65,19 @@ class ExamController extends Controller
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'duration' => 'sometimes|integer|min:1',
+            'attachment' => 'nullable|file|mimes:pdf,doc,docx,ppt,pptx,zip|max:10240',
         ]);
 
-        $exam->update($request->only(['title', 'description', 'duration']));
+        $data = $request->only(['title', 'description']);
+
+        if ($request->hasFile('attachment')) {
+            if ($exam->attachment && ! filter_var($exam->attachment, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($exam->attachment);
+            }
+            $data['attachment'] = $request->file('attachment')->store('exams', 'public');
+        }
+
+        $exam->update($data);
 
         return response()->json([
             'message' => 'Exam updated successfully',
@@ -91,11 +86,16 @@ class ExamController extends Controller
     }
 
     /**
-     * Delete exam (any exam)
+     * Delete exam and its file.
      */
     public function destroy($examId)
     {
         $exam = Exam::findOrFail($examId);
+
+        if ($exam->attachment && ! filter_var($exam->attachment, FILTER_VALIDATE_URL)) {
+            Storage::disk('public')->delete($exam->attachment);
+        }
+
         $exam->delete();
 
         return response()->json(['message' => 'Exam deleted successfully']);

@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Api\Admin\BannerController;
 use App\Http\Controllers\Api\Admin\ChatGroupController as AdminChatGroupController;
+use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
 use App\Http\Controllers\Api\Admin\CourseController as AdminCourseController;
 use App\Http\Controllers\Api\Admin\CourseSectionController as AdminCourseSectionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\DepartmentController as AdminDepartmentController;
 use App\Http\Controllers\Api\Admin\ExamController as AdminExamController;
+use App\Http\Controllers\Api\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Api\Admin\InstructorController as AdminInstructorController;
 use App\Http\Controllers\Api\Admin\NoteController as AdminNoteController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
@@ -42,6 +44,7 @@ use App\Http\Controllers\Api\Student\ReferralController;
 use App\Http\Controllers\Api\Student\SupportController as StudentSupportController;
 use App\Http\Controllers\Api\Student\VideoDownloadController;
 use App\Http\Controllers\Api\Student\WalletController;
+use App\Models\Year;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -58,7 +61,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public Routes (no token required - for registration screen)
 Route::get('departments', [StudentCourseController::class, 'departments']);
-Route::get('years', fn () => response()->json(\App\Models\Year::where('active', true)->orderBy('order')->get()));
+Route::get('years', fn () => response()->json(Year::where('active', true)->orderBy('order')->get()));
 
 // Public Auth Routes
 Route::prefix('auth')->group(function () {
@@ -150,7 +153,7 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     // Courses
     Route::get('courses', [InstructorCourseController::class, 'index']);
     Route::post('courses', [InstructorCourseController::class, 'store']);
-    Route::put('courses/{courseId}', [InstructorCourseController::class, 'update']);
+    Route::match(['put', 'post'], 'courses/{courseId}', [InstructorCourseController::class, 'update']);
     Route::get('courses/{courseId}/stats', [InstructorCourseController::class, 'stats']);
 
     // Videos
@@ -168,7 +171,7 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     // Exams
     Route::get('courses/{courseId}/exams', [ExamController::class, 'index']);
     Route::post('exams', [ExamController::class, 'store']);
-    Route::put('exams/{examId}', [ExamController::class, 'update']);
+    Route::match(['put', 'post'], 'exams/{examId}', [ExamController::class, 'update']);
     Route::delete('exams/{examId}', [ExamController::class, 'destroy']);
 
     // Chat Groups
@@ -197,6 +200,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Students
     Route::get('students', [AdminStudentController::class, 'index']);
     Route::post('students', [AdminStudentController::class, 'store']);
+    Route::get('students/{studentId}/wallet-qr-preview', [AdminStudentController::class, 'walletQrPreview']);
     Route::get('students/{studentId}', [AdminStudentController::class, 'show']);
     Route::put('students/{studentId}', [AdminStudentController::class, 'update']);
     Route::post('students/{studentId}/enroll', [AdminStudentController::class, 'enrollStudent']);
@@ -205,10 +209,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('students/{studentId}', [AdminStudentController::class, 'destroy']);
 
     // Instructors
+    Route::get('instructors/finance-summary', [AdminInstructorController::class, 'financeSummary']);
     Route::get('instructors', [AdminInstructorController::class, 'index']);
     Route::post('instructors', [AdminInstructorController::class, 'store']);
     Route::get('instructors/{instructorId}', [AdminInstructorController::class, 'show']);
+    Route::match(['put', 'post'], 'instructors/{instructorId}', [AdminInstructorController::class, 'update']);
     Route::put('instructors/{instructorId}/permissions', [AdminInstructorController::class, 'updatePermissions']);
+    Route::get('instructors/{instructorId}/wallet-overview', [AdminInstructorController::class, 'walletOverview']);
+    Route::post('instructors/{instructorId}/wallet', [AdminInstructorController::class, 'updateWallet']);
     Route::post('instructors/{instructorId}/toggle-suspend', [AdminInstructorController::class, 'toggleSuspend']);
     Route::post('instructors/{instructorId}/courses', [AdminInstructorController::class, 'createCourse']);
     Route::delete('instructors/{instructorId}', [AdminInstructorController::class, 'destroy']);
@@ -217,8 +225,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('courses', [AdminCourseController::class, 'index']);
     Route::post('courses', [AdminCourseController::class, 'store']);
     Route::get('courses/{courseId}', [AdminCourseController::class, 'show']);
-    Route::put('courses/{courseId}', [AdminCourseController::class, 'update']);
+    Route::match(['put', 'post'], 'courses/{courseId}', [AdminCourseController::class, 'update']);
     Route::get('courses/{courseId}/stats', [AdminCourseController::class, 'stats']);
+    Route::get('courses/{courseId}/subscriptions', [AdminCourseController::class, 'subscriptions']);
     Route::post('courses/{courseId}/approve', [AdminCourseController::class, 'approve']);
     Route::post('courses/{courseId}/reject', [AdminCourseController::class, 'reject']);
     Route::post('courses/{courseId}/suspend', [AdminCourseController::class, 'suspend']);
@@ -248,7 +257,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Exams (امتحانات لأي كورس)
     Route::get('courses/{courseId}/exams', [AdminExamController::class, 'index']);
     Route::post('exams', [AdminExamController::class, 'store']);
-    Route::put('exams/{examId}', [AdminExamController::class, 'update']);
+    Route::match(['put', 'post'], 'exams/{examId}', [AdminExamController::class, 'update']);
     Route::delete('exams/{examId}', [AdminExamController::class, 'destroy']);
 
     // Chat Groups (مجموعات دردشة لأي كورس)
@@ -299,6 +308,12 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('semesters/{id}', [AdminSemesterController::class, 'update']);
     Route::delete('semesters/{id}', [AdminSemesterController::class, 'destroy']);
 
+    // Coupons (admin CRUD)
+    Route::get('coupons', [AdminCouponController::class, 'index']);
+    Route::post('coupons', [AdminCouponController::class, 'store']);
+    Route::put('coupons/{couponId}', [AdminCouponController::class, 'update']);
+    Route::delete('coupons/{couponId}', [AdminCouponController::class, 'destroy']);
+
     // Banners
     Route::get('banners', [BannerController::class, 'index']);
     Route::post('banners', [BannerController::class, 'store']);
@@ -315,6 +330,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('subscriptions/{id}', [AdminSubscriptionController::class, 'show']);
     Route::post('subscriptions/{id}/toggle-status', [AdminSubscriptionController::class, 'toggleStatus']);
     Route::post('subscriptions/{id}/refund', [AdminSubscriptionController::class, 'refund']);
+
+    // Finance aggregates (admin dashboard)
+    Route::get('finance/platform-totals', [AdminFinanceController::class, 'platformTotals']);
 
     // Wallets
     Route::get('wallets', [AdminWalletController::class, 'index']);

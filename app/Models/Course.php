@@ -19,6 +19,7 @@ class Course extends Model
         'description',
         'image',
         'price',
+        'admin_commission',
         'allow_section_purchase',
         'allow_lesson_purchase',
         'free_first_lesson',
@@ -31,6 +32,7 @@ class Course extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
+        'admin_commission' => 'decimal:2',
         'allow_section_purchase' => 'boolean',
         'allow_lesson_purchase' => 'boolean',
         'free_first_lesson' => 'boolean',
@@ -42,8 +44,13 @@ class Course extends Model
 
     public function getImageAttribute($value): ?string
     {
-        if (!$value) return null;
-        if (filter_var($value, FILTER_VALIDATE_URL)) return $value;
+        if (! $value) {
+            return null;
+        }
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
         return Storage::disk('public')->url($value);
     }
 

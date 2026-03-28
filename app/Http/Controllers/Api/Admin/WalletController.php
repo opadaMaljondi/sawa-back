@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 
 class WalletController extends Controller
@@ -17,8 +18,16 @@ class WalletController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Wallet::with('user:id,full_name,email,phone,type')
-            ->whereHas('user', fn ($q) => $q->where('type', 'student'));
+        $query = Wallet::with('user:id,full_name,email,phone,type');
+
+        $userType = $request->input('user_type', 'student');
+        if ($userType === 'all') {
+            $query->whereHas('user', fn ($q) => $q->whereIn('type', ['student', 'instructor']));
+        } elseif (in_array($userType, ['student', 'instructor'], true)) {
+            $query->whereHas('user', fn ($q) => $q->where('type', $userType));
+        } else {
+            $query->whereHas('user', fn ($q) => $q->where('type', 'student'));
+        }
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -51,15 +60,24 @@ class WalletController extends Controller
     {
         $user = User::findOrFail($userId);
 
-        $wallet = Wallet::where('user_id', $userId)->firstOrFail();
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $userId],
+            [
+                'balance' => 0,
+                'currency' => 'SYP',
+                'total_deposited' => 0,
+                'total_spent' => 0,
+                'active' => true,
+            ]
+        );
 
         $transactions = Transaction::where('wallet_id', $wallet->id)
             ->latest()
             ->paginate(50);
 
         return response()->json([
-            'user'         => $user->only(['id', 'full_name', 'email', 'phone']),
-            'wallet'       => $wallet,
+            'user' => $user->only(['id', 'full_name', 'email', 'phone', 'type']),
+            'wallet' => $wallet,
             'transactions' => $transactions,
         ]);
     }
@@ -73,15 +91,15 @@ class WalletController extends Controller
     public function adjust(Request $request, $userId)
     {
         $request->validate([
-            'type'   => 'required|in:deposit,withdraw,refund',
+            'type' => 'required|in:deposit,withdraw,refund',
             'amount' => 'required|numeric|min:0.01',
-            'note'   => 'nullable|string|max:500',
+            'note' => 'nullable|string|max:500',
         ]);
 
-        $user          = User::findOrFail($userId);
-        $walletService = app(\App\Services\WalletService::class);
-        $noteText      = $request->note ?? 'Admin adjustment';
-        $meta          = ['admin_id' => auth()->id(), 'note' => $request->note];
+        $user = User::findOrFail($userId);
+        $walletService = app(WalletService::class);
+        $noteText = $request->note ?? 'Admin adjustment';
+        $meta = ['admin_id' => auth()->id(), 'note' => $request->note];
 
         if ($request->type === 'deposit') {
             $walletService->deposit($user->id, (float) $request->amount, "إيداع: {$noteText}", $meta);
@@ -97,7 +115,7 @@ class WalletController extends Controller
 
         return response()->json([
             'message' => 'Wallet adjusted successfully.',
-            'wallet'  => Wallet::where('user_id', $user->id)->first(),
+            'wallet' => Wallet::where('user_id', $user->id)->first(),
         ]);
     }
 
@@ -108,10 +126,14 @@ class WalletController extends Controller
      */
     public function transactions(Request $request)
     {
-        $query = Transaction::with(['wallet.user:id,full_name,email'])->latest();
+        $query = Transaction::with(['wallet.user:id,full_name,email,phone,type'])->latest();
 
         if ($request->filled('type')) {
             $query->where('type', $request->type);
+        }
+
+        if ($request->filled('user_type') && in_array($request->user_type, ['student', 'instructor'], true)) {
+            $query->whereHas('wallet.user', fn ($q) => $q->where('type', $request->user_type));
         }
 
         if ($request->filled('from')) {
@@ -127,6 +149,7 @@ class WalletController extends Controller
             $query->whereHas('wallet.user', fn ($q) => $q
                 ->where('full_name', 'like', "%{$s}%")
                 ->orWhere('email', 'like', "%{$s}%")
+                ->orWhere('phone', 'like', "%{$s}%")
             );
         }
 

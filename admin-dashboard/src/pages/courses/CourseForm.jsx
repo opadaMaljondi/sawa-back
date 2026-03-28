@@ -20,6 +20,7 @@ const CourseForm = () => {
     title: '',
     description: '',
     price: '',
+    admin_commission: '',
     status: 'draft',
     active: true,
     allow_section_purchase: false,
@@ -57,6 +58,7 @@ const CourseForm = () => {
           title: res.title,
           description: res.description || '',
           price: res.price ?? '',
+          admin_commission: res.admin_commission ?? '',
           status: res.status,
           active: res.active,
           allow_section_purchase: !!res.allow_section_purchase,
@@ -89,6 +91,12 @@ const CourseForm = () => {
       fd.append('title', form.title);
       fd.append('description', form.description || '');
       fd.append('price', Number(form.price) || 0);
+      fd.append(
+        'admin_commission',
+        form.admin_commission === '' || form.admin_commission === null
+          ? '0'
+          : String(Number(form.admin_commission)),
+      );
       fd.append('status', form.status);
       fd.append('active', form.active ? '1' : '0');
       fd.append('allow_section_purchase', form.allow_section_purchase ? '1' : '0');
@@ -190,6 +198,18 @@ const CourseForm = () => {
             required
             fullWidth
           />
+
+          <Input
+            label={t('courses.adminCommission')}
+            type="number"
+            min={0}
+            max={100}
+            step={0.01}
+            value={form.admin_commission}
+            onChange={handleChange('admin_commission')}
+            fullWidth
+          />
+          <p className="text-xs text-gray-500 -mt-2">{t('courses.adminCommissionHint')}</p>
 
           <div>
             <label className="input-label">صورة الكورس (Banner)</label>
