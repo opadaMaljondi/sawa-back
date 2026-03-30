@@ -24,6 +24,12 @@ class YtDlpService
         $timeout = $timeout ?: (int) config('yt_dlp.timeout', 90);
         $cookies = config('yt_dlp.cookies');
         $cookiesFromBrowser = config('yt_dlp.cookies_from_browser');
+        if (is_string($cookies) && $cookies !== '' && ! File::exists($cookies)) {
+            throw new \RuntimeException('YT_DLP_COOKIES is set but file was not found: '.$cookies);
+        }
+        if (is_string($cookies) && $cookies !== '' && ! File::isReadable($cookies)) {
+            throw new \RuntimeException('YT_DLP_COOKIES file is not readable: '.$cookies);
+        }
 
         $formatsToTry = array_values(array_unique(array_filter([
             $format,
@@ -53,7 +59,7 @@ class YtDlpService
                     if (str_contains(strtolower($errorOutput), 'sign in to confirm you’re not a bot')
                         || str_contains(strtolower($errorOutput), "sign in to confirm you're not a bot")) {
                         throw new \RuntimeException(
-                            'YouTube blocked anonymous extraction for this server. Set YT_DLP_COOKIES or YT_DLP_COOKIES_FROM_BROWSER and retry.'
+                            'YouTube blocked extraction for this server/cookies. Provide a valid YT_DLP_COOKIES file from a logged-in YouTube session and retry.'
                         );
                     }
 
