@@ -129,6 +129,9 @@ class User extends Authenticatable
         if (!$courseId) {
             return false;
         }
+        if ($lesson->is_free) {
+            return true;
+        }
 
         $sectionId = $lesson->section_id ?? $lesson->section?->id;
 
