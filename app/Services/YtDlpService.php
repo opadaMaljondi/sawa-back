@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
@@ -33,11 +34,11 @@ class YtDlpService
         foreach ($formatsToTry as $formatToTry) {
             try {
                 $cmd = [$bin, '--no-playlist', '--no-warnings', '-f', $formatToTry, '-g'];
-                if (is_string($cookies) && $cookies !== '') {
+                // Prefer explicit cookies file on servers; browser profiles often do not exist.
+                if (is_string($cookies) && $cookies !== '' && File::exists($cookies)) {
                     $cmd[] = '--cookies';
                     $cmd[] = $cookies;
-                }
-                if (is_string($cookiesFromBrowser) && $cookiesFromBrowser !== '') {
+                } elseif (is_string($cookiesFromBrowser) && $cookiesFromBrowser !== '') {
                     $cmd[] = '--cookies-from-browser';
                     $cmd[] = $cookiesFromBrowser;
                 }
