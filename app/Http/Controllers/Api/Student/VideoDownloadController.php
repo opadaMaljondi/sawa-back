@@ -5,17 +5,20 @@ namespace App\Http\Controllers\Api\Student;
 use App\Http\Controllers\Controller;
 use App\Models\DownloadedLesson;
 use App\Models\Lesson;
+use App\Services\YouTubeService;
 use App\Services\VideoEncryptionService;
+use App\Services\YtDlpService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class VideoDownloadController extends Controller
 {
     protected VideoEncryptionService $encryptionService;
+    protected YtDlpService $ytDlpService;
 
-    public function __construct(VideoEncryptionService $encryptionService)
+    public function __construct(VideoEncryptionService $encryptionService, YtDlpService $ytDlpService)
     {
         $this->encryptionService = $encryptionService;
+        $this->ytDlpService = $ytDlpService;
     }
 
     /**
@@ -45,7 +48,23 @@ class VideoDownloadController extends Controller
         $encryptedPath = storage_path('app/videos/encrypted/' . $student->id . '/' . $lessonId . '.enc');
 
         if (!file_exists($tempPath)) {
-            return response()->json(['message' => 'Video file not found'], 404);
+            // No local cached file: return a direct download URL using yt-dlp
+            $pageUrl = YouTubeService::playbackUrl((string) $lesson->video_reference);
+            $format = $request->string('format')->toString() ?: null;
+
+            try {
+                $directUrl = $this->ytDlpService->getDirectUrl($pageUrl, $format);
+
+                return response()->json([
+                    'message' => 'Download URL generated',
+                    'download_url' => $directUrl,
+                ]);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Failed to generate download URL',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
         }
 
         $encryptionData = $this->encryptionService->encryptVideo($tempPath, $encryptedPath);
