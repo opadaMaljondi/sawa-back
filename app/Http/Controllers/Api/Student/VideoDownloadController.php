@@ -51,9 +51,10 @@ class VideoDownloadController extends Controller
             // No local cached file: return a direct download URL using yt-dlp
             $pageUrl = YouTubeService::playbackUrl((string) $lesson->video_reference);
             $format = $request->string('format')->toString() ?: null;
+            $timeout = $request->integer('timeout');
 
             try {
-                $directUrl = $this->ytDlpService->getDirectUrl($pageUrl, $format);
+                $directUrl = $this->ytDlpService->getDirectUrl($pageUrl, $format, $timeout > 0 ? $timeout : null);
 
                 return response()->json([
                     'message' => 'Download URL generated',

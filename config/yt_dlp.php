@@ -35,6 +35,6 @@ return [
     | Process timeout (seconds)
     |--------------------------------------------------------------------------
     */
-    'timeout' => (int) env('YT_DLP_TIMEOUT', 20),
+    'timeout' => (int) env('YT_DLP_TIMEOUT', 90),
 ];
 
