@@ -32,6 +32,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Optional browser cookies source
+    |--------------------------------------------------------------------------
+    |
+    | Example values:
+    | chrome
+    | firefox
+    | brave
+    |
+    | When set, yt-dlp will use --cookies-from-browser=<value>.
+    |
+    */
+    'cookies_from_browser' => env('YT_DLP_COOKIES_FROM_BROWSER', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | Process timeout (seconds)
     |--------------------------------------------------------------------------
     */

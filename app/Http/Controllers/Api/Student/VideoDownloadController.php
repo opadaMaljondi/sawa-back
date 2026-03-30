@@ -61,10 +61,17 @@ class VideoDownloadController extends Controller
                     'download_url' => $directUrl,
                 ]);
             } catch (\Throwable $e) {
+                $errorMessage = $e->getMessage();
+                $isBotChallenge = str_contains(strtolower($errorMessage), 'blocked anonymous extraction')
+                    || str_contains(strtolower($errorMessage), 'not a bot');
+
                 return response()->json([
-                    'message' => 'Failed to generate download URL',
-                    'error' => $e->getMessage(),
-                ], 500);
+                    'message' => $isBotChallenge
+                        ? 'YouTube requires authenticated cookies on this server'
+                        : 'Failed to generate download URL',
+                    'error' => $errorMessage,
+                    'playback_url' => $pageUrl,
+                ], $isBotChallenge ? 403 : 500);
             }
         }
 

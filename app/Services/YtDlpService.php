@@ -22,6 +22,7 @@ class YtDlpService
         $format = $format ?: $defaultFormat;
         $timeout = $timeout ?: (int) config('yt_dlp.timeout', 90);
         $cookies = config('yt_dlp.cookies');
+        $cookiesFromBrowser = config('yt_dlp.cookies_from_browser');
 
         $formatsToTry = array_values(array_unique(array_filter([
             $format,
@@ -36,6 +37,10 @@ class YtDlpService
                     $cmd[] = '--cookies';
                     $cmd[] = $cookies;
                 }
+                if (is_string($cookiesFromBrowser) && $cookiesFromBrowser !== '') {
+                    $cmd[] = '--cookies-from-browser';
+                    $cmd[] = $cookiesFromBrowser;
+                }
                 $cmd[] = $pageUrl;
 
                 $process = new Process($cmd);
@@ -43,10 +48,18 @@ class YtDlpService
                 $process->run();
 
                 if (! $process->isSuccessful()) {
+                    $errorOutput = (string) $process->getErrorOutput();
+                    if (str_contains(strtolower($errorOutput), 'sign in to confirm you’re not a bot')
+                        || str_contains(strtolower($errorOutput), "sign in to confirm you're not a bot")) {
+                        throw new \RuntimeException(
+                            'YouTube blocked anonymous extraction for this server. Set YT_DLP_COOKIES or YT_DLP_COOKIES_FROM_BROWSER and retry.'
+                        );
+                    }
+
                     Log::warning('yt-dlp failed', [
                         'format' => $formatToTry,
                         'exit_code' => $process->getExitCode(),
-                        'error' => $process->getErrorOutput(),
+                        'error' => $errorOutput,
                         'output' => $process->getOutput(),
                     ]);
                     throw new ProcessFailedException($process);
