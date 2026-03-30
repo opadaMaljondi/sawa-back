@@ -56,6 +56,18 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    /*
+    | Admin SPA origin (Vite/React). Used for wallet QR links so scans open /students/:id on the dashboard,
+    | not the Laravel API host (APP_URL).
+    */
+    'admin_dashboard_url' => env('ADMIN_DASHBOARD_URL'),
+
+    /*
+    | Override QR base only if different from admin_dashboard_url.
+    | Resolution: WALLET_QR_BASE_URL → ADMIN_DASHBOARD_URL → APP_URL
+    */
+    'wallet_qr_base_url' => env('WALLET_QR_BASE_URL'),
+
     'asset_url' => env('ASSET_URL', '/'),
 
     /*

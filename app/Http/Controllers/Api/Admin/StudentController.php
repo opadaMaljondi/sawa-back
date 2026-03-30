@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\CourseCommissionService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -198,6 +199,8 @@ class StudentController extends Controller
         }
 
         $originalPrice = (float) $course->price;
+        $finalPrice = $request->boolean('free') ? 0.0 : $originalPrice;
+        $commission = CourseCommissionService::splitForCourse($course, $finalPrice);
 
         $enrollment = Enrollment::create([
             'student_id' => $student->id,
@@ -208,7 +211,10 @@ class StudentController extends Controller
             'note_id' => $request->note_id ?? null,
             'original_price' => $originalPrice,
             'discount' => $request->boolean('free') ? $originalPrice : 0,
-            'final_price' => $request->boolean('free') ? 0 : $originalPrice,
+            'final_price' => $finalPrice,
+            'admin_commission_percent' => $commission['admin_commission_percent'],
+            'platform_amount' => $commission['platform_amount'],
+            'instructor_amount' => $commission['instructor_amount'],
             'active' => true,
             'enrolled_at' => now(),
         ]);

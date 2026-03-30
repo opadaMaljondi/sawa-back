@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\CourseCommissionService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,23 +18,31 @@ use Spatie\Permission\Models\Permission;
 class InstructorController extends Controller
 {
     /**
-     * Get all instructors
+     * Get all instructors (search + department + active).
      */
     public function index(Request $request)
     {
         $query = User::where('type', 'instructor')
             ->with(['courses']);
 
-        // فلترة حسب القسم
-        if ($request->has('department_id')) {
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(fn ($q) => $q->where('full_name', 'like', "%{$s}%")
+                ->orWhere('email', 'like', "%{$s}%")
+                ->orWhere('phone', 'like', "%{$s}%"));
+        }
+
+        if ($request->filled('department_id')) {
             $query->whereHas('courses.subject', function ($q) use ($request) {
                 $q->where('department_id', $request->department_id);
             });
         }
 
-        $instructors = $query->paginate(20);
+        if ($request->filled('active')) {
+            $query->where('active', $request->boolean('active'));
+        }
 
-        return response()->json($instructors);
+        return response()->json($query->latest()->paginate(20));
     }
 
     /**
@@ -208,7 +217,7 @@ class InstructorController extends Controller
             ? collect()
             : Enrollment::whereIn('course_id', $courseIds)
                 ->where('active', true)
-                ->get(['course_id', 'final_price']);
+                ->get(['course_id', 'final_price', 'platform_amount', 'instructor_amount']);
 
         $statsByInstructor = [];
         foreach ($instructorIds as $iid) {
@@ -225,10 +234,12 @@ class InstructorController extends Controller
                 continue;
             }
             $iid = $course->instructor_id;
-            $teacher = $this->teacherShareFromFinalPrice(
-                (float) $enrollment->final_price,
-                (float) ($course->admin_commission ?? 0)
-            );
+            $teacher = $enrollment->instructor_amount !== null
+                ? (float) $enrollment->instructor_amount
+                : CourseCommissionService::splitForCourse(
+                    $course,
+                    (float) $enrollment->final_price
+                )['instructor_amount'];
             $statsByInstructor[$iid]['total_sales'] += (float) $enrollment->final_price;
             $statsByInstructor[$iid]['teacher_earnings'] += $teacher;
             $statsByInstructor[$iid]['enrollment_count']++;
@@ -294,7 +305,7 @@ class InstructorController extends Controller
             ? collect()
             : Enrollment::whereIn('course_id', $courseIds)
                 ->where('active', true)
-                ->get(['id', 'course_id', 'final_price']);
+                ->get(['id', 'course_id', 'final_price', 'platform_amount', 'instructor_amount']);
 
         $earningsByCourseId = [];
         foreach ($enrollments as $enrollment) {
@@ -302,10 +313,12 @@ class InstructorController extends Controller
             if (! $course) {
                 continue;
             }
-            $teacher = $this->teacherShareFromFinalPrice(
-                (float) $enrollment->final_price,
-                (float) ($course->admin_commission ?? 0)
-            );
+            $teacher = $enrollment->instructor_amount !== null
+                ? (float) $enrollment->instructor_amount
+                : CourseCommissionService::splitForCourse(
+                    $course,
+                    (float) $enrollment->final_price
+                )['instructor_amount'];
             $cid = $course->id;
             if (! isset($earningsByCourseId[$cid])) {
                 $earningsByCourseId[$cid] = [
@@ -388,14 +401,6 @@ class InstructorController extends Controller
             'message' => 'Wallet updated successfully.',
             'wallet' => Wallet::where('user_id', $instructor->id)->first(),
         ]);
-    }
-
-    private function teacherShareFromFinalPrice(float $finalPrice, float $adminCommissionPercent): float
-    {
-        $rate = $adminCommissionPercent / 100;
-        $adminAmount = round($finalPrice * $rate, 2);
-
-        return round($finalPrice - $adminAmount, 2);
     }
 
     /**

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\StudentWalletQr;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,13 +26,20 @@ class StudentAuthController extends Controller
             'department_id' => 'nullable|exists:departments,id',
             'year_id'       => 'nullable|exists:years,id',
             'referral_code' => 'nullable|string',
+            'image'         => 'nullable|image',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('profiles', 'public');
+        }
 
         $user = User::create([
             'full_name'     => $data['full_name'],
             'email'         => $data['email'],
             'phone'         => $data['phone'],
             'password'      => Hash::make($data['password']),
+            'image'         => $imagePath,
             'type'          => 'student',
             'department_id' => $data['department_id'] ?? null,
             'year_id'       => $data['year_id'] ?? null,
@@ -52,11 +61,7 @@ class StudentAuthController extends Controller
 
         $token = $user->createToken('student-token')->plainTextToken;
 
-        return response()->json([
-            'user'             => $user,
-            'token'            => $token,
-            'profile_complete' => !is_null($user->department_id) && !is_null($user->year_id),
-        ], 201);
+        return $this->jsonStudentAuth($user, $token, 201);
     }
 
     /**
@@ -93,11 +98,7 @@ class StudentAuthController extends Controller
 
         $token = $user->createToken('student-token')->plainTextToken;
 
-        return response()->json([
-            'user'             => $user,
-            'token'            => $token,
-            'profile_complete' => !is_null($user->department_id) && !is_null($user->year_id),
-        ]);
+        return $this->jsonStudentAuth($user, $token);
     }
 
     /**
@@ -157,11 +158,7 @@ class StudentAuthController extends Controller
 
         $token = $user->createToken('student-token')->plainTextToken;
 
-        return response()->json([
-            'user'             => $user,
-            'token'            => $token,
-            'profile_complete' => !is_null($user->department_id) && !is_null($user->year_id),
-        ], $isNew ? 201 : 200);
+        return $this->jsonStudentAuth($user, $token, $isNew ? 201 : 200);
     }
 
     /**
@@ -172,5 +169,28 @@ class StudentAuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    protected function jsonStudentAuth(User $user, string $token, int $status = 200): JsonResponse
+    {
+        $user->loadMissing('wallet');
+        if (! $user->wallet) {
+            $user->wallet()->create([
+                'balance' => 0,
+                'currency' => 'SYP',
+                'total_deposited' => 0,
+                'total_spent' => 0,
+                'active' => true,
+            ]);
+            $user->load('wallet');
+        }
+        $user->load(['department', 'year']);
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'wallet_qr' => StudentWalletQr::qrPayload($user->id),
+            'profile_complete' => ! is_null($user->department_id) && ! is_null($user->year_id),
+        ], $status);
     }
 }

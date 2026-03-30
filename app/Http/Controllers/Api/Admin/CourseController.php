@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\User;
+use App\Services\CourseCommissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -18,22 +19,33 @@ class CourseController extends Controller
     {
         $query = Course::with(['instructor', 'subject', 'sections.lessons']);
 
-        // فلترة وبحث
-        if ($request->has('keyword')) {
-            $query->where('title', 'like', '%'.$request->keyword.'%');
+        if ($request->filled('keyword')) {
+            $k = $request->keyword;
+            $query->where(fn ($q) => $q->where('title', 'like', "%{$k}%")
+                ->orWhere('description', 'like', "%{$k}%"));
         }
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('instructor_id')) {
+        if ($request->filled('instructor_id')) {
             $query->where('instructor_id', $request->instructor_id);
         }
 
-        $courses = $query->paginate(20);
+        if ($request->filled('subject_id')) {
+            $query->where('subject_id', $request->subject_id);
+        }
 
-        return response()->json($courses);
+        if ($request->filled('department_id')) {
+            $query->whereHas('subject', fn ($q) => $q->where('department_id', $request->department_id));
+        }
+
+        if ($request->filled('active')) {
+            $query->where('active', $request->boolean('active'));
+        }
+
+        return response()->json($query->latest()->paginate(20));
     }
 
     /**
@@ -190,8 +202,13 @@ class CourseController extends Controller
 
         $paginator->through(function (Enrollment $e) use ($course, $commissionRate) {
             $final = (float) $e->final_price;
-            $adminAmount = round($final * $commissionRate, 2);
-            $teacherAmount = round($final - $adminAmount, 2);
+            if ($e->platform_amount !== null && $e->instructor_amount !== null) {
+                $adminAmount = (float) $e->platform_amount;
+                $teacherAmount = (float) $e->instructor_amount;
+            } else {
+                $adminAmount = round($final * $commissionRate, 2);
+                $teacherAmount = round($final - $adminAmount, 2);
+            }
 
             return [
                 'id' => $e->id,
@@ -209,13 +226,28 @@ class CourseController extends Controller
             ];
         });
 
-        $activeFinal = (float) Enrollment::where('course_id', $courseId)->where('active', true)->sum('final_price');
-        $totalAdmin = round($activeFinal * $commissionRate, 2);
+        $activeRows = Enrollment::where('course_id', $courseId)
+            ->where('active', true)
+            ->get(['final_price', 'platform_amount', 'instructor_amount']);
+        $totalFinal = 0.0;
+        $totalAdmin = 0.0;
+        $totalTeacher = 0.0;
+        foreach ($activeRows as $e) {
+            $totalFinal += (float) $e->final_price;
+            if ($e->platform_amount !== null && $e->instructor_amount !== null) {
+                $totalAdmin += (float) $e->platform_amount;
+                $totalTeacher += (float) $e->instructor_amount;
+            } else {
+                $s = CourseCommissionService::splitForCourse($course, (float) $e->final_price);
+                $totalAdmin += $s['platform_amount'];
+                $totalTeacher += $s['instructor_amount'];
+            }
+        }
         $summary = [
             'admin_commission_percent' => (float) ($course->admin_commission ?? 0),
-            'total_final_price' => round($activeFinal, 2),
-            'total_admin_amount' => $totalAdmin,
-            'total_teacher_amount' => round($activeFinal - $totalAdmin, 2),
+            'total_final_price' => round($totalFinal, 2),
+            'total_admin_amount' => round($totalAdmin, 2),
+            'total_teacher_amount' => round($totalTeacher, 2),
         ];
 
         $payload = $paginator->toArray();

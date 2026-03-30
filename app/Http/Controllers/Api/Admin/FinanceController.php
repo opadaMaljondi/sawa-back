@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Transaction;
 use App\Models\Wallet;
+use App\Services\CourseCommissionService;
 use Illuminate\Support\Facades\DB;
 
 class FinanceController extends Controller
@@ -67,15 +69,19 @@ class FinanceController extends Controller
             ->with('course:id,admin_commission')
             ->chunk(1000, function ($rows) use (&$platformCommission, &$teacherShareAccrued) {
                 foreach ($rows as $e) {
-                    $course = $e->course;
-                    if (! $course) {
+                    $final = (float) $e->final_price;
+                    if ($e->platform_amount !== null && $e->instructor_amount !== null) {
+                        $platformCommission += (float) $e->platform_amount;
+                        $teacherShareAccrued += (float) $e->instructor_amount;
                         continue;
                     }
-                    $final = (float) $e->final_price;
-                    $rate = (float) ($course->admin_commission ?? 0) / 100;
-                    $adminAmt = round($final * $rate, 2);
-                    $platformCommission += $adminAmt;
-                    $teacherShareAccrued += round($final - $adminAmt, 2);
+                    $course = $e->course;
+                    if (! $course instanceof Course) {
+                        continue;
+                    }
+                    $split = CourseCommissionService::splitForCourse($course, $final);
+                    $platformCommission += $split['platform_amount'];
+                    $teacherShareAccrued += $split['instructor_amount'];
                 }
             });
 

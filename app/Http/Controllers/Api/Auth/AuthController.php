@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\StudentWalletQr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -19,13 +20,20 @@ class AuthController extends Controller
             'email'     => 'required|email|unique:users,email',
             'phone'     => 'required|string|unique:users,phone',
             'password'  => 'required|string|min:6|confirmed',
+            'image'     => 'nullable|image',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('profiles', 'public');
+        }
 
         $user = User::create([
             'full_name' => $data['full_name'],
             'email'     => $data['email'],
             'phone'     => $data['phone'],
             'password'  => Hash::make($data['password']),
+            'image'     => $imagePath,
             'type'      => 'student',
         ]);
 
@@ -34,11 +42,23 @@ class AuthController extends Controller
             $user->assignRole('student');
         }
 
+        $user->wallet()->create([
+            'balance' => 0,
+            'currency' => 'SYP',
+            'total_deposited' => 0,
+            'total_spent' => 0,
+            'active' => true,
+        ]);
+
+        $user->load(['wallet', 'department', 'year']);
+
         $token = $user->createToken('student-token')->plainTextToken;
 
         return response()->json([
-            'user'  => $user,
+            'user' => $user,
             'token' => $token,
+            'wallet_qr' => StudentWalletQr::qrPayload($user->id),
+            'profile_complete' => ! is_null($user->department_id) && ! is_null($user->year_id),
         ], 201);
     }
 
@@ -64,10 +84,30 @@ class AuthController extends Controller
 
         $token = $user->createToken($user->type . '-token')->plainTextToken;
 
-        return response()->json([
-            'user'  => $user,
+        $payload = [
+            'user' => $user,
             'token' => $token,
-        ]);
+        ];
+
+        if ($user->type === 'student') {
+            $user->loadMissing('wallet');
+            if (! $user->wallet) {
+                $user->wallet()->create([
+                    'balance' => 0,
+                    'currency' => 'SYP',
+                    'total_deposited' => 0,
+                    'total_spent' => 0,
+                    'active' => true,
+                ]);
+                $user->load('wallet');
+            }
+            $user->load(['department', 'year']);
+            $payload['user'] = $user;
+            $payload['wallet_qr'] = StudentWalletQr::qrPayload($user->id);
+            $payload['profile_complete'] = ! is_null($user->department_id) && ! is_null($user->year_id);
+        }
+
+        return response()->json($payload);
     }
 }
 

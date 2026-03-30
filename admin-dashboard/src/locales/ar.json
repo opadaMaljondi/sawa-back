@@ -260,7 +260,12 @@
         "videoDuration": "مدة الفيديو",
         "totalCourses": "إجمالي الكورسات",
         "publishedCourses": "الكورسات المنشورة",
-        "draftCourses": "المسودات"
+        "draftCourses": "المسودات",
+        "publishStatus": "النشر",
+        "stateDraft": "مسودة",
+        "statePending": "قيد المراجعة",
+        "statePublished": "منشور",
+        "listingActive": "الظهور"
     },
     "permissions": {
         "title": "إدارة الصلاحيات",

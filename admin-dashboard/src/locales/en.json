@@ -260,7 +260,12 @@
         "videoDuration": "Video Duration",
         "totalCourses": "Total Courses",
         "publishedCourses": "Published Courses",
-        "draftCourses": "Drafts"
+        "draftCourses": "Drafts",
+        "publishStatus": "Publication",
+        "stateDraft": "Draft",
+        "statePending": "Pending",
+        "statePublished": "Published",
+        "listingActive": "Listing"
     },
     "permissions": {
         "title": "Permission Management",

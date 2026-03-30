@@ -72,16 +72,45 @@
 							{
 								"key": "Accept",
 								"value": "application/json"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
 							}
 						],
 						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"full_name\": \"Ahmed Ali\",\n  \"email\": \"student@example.com\",\n  \"phone\": \"07501234567\",\n  \"password\": \"password\",\n  \"password_confirmation\": \"password\"\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "full_name",
+									"value": "Ahmed Ali",
+									"type": "text"
+								},
+								{
+									"key": "email",
+									"value": "student@example.com",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "07501234567",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "password_confirmation",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"description": "Optional profile photo (multipart)",
+									"type": "file",
+									"src": ""
+								}
+							]
 						},
+						"description": "Send as multipart/form-data to attach an optional profile image. JSON body (application/json) without image is still supported.",
 						"url": "{{base_url}}/auth/register"
 					}
 				},
@@ -114,16 +143,60 @@
 							{
 								"key": "Accept",
 								"value": "application/json"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
 							}
 						],
 						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"full_name\": \"Ahmed Ali\",\n  \"email\": \"student@example.com\",\n  \"phone\": \"07501234567\",\n  \"password\": \"password\",\n  \"password_confirmation\": \"password\",\n  \"department_id\": 1,\n  \"year_id\": 1,\n  \"referral_code\": null\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "full_name",
+									"value": "Ahmed Ali",
+									"type": "text"
+								},
+								{
+									"key": "email",
+									"value": "student@example.com",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "07501234567",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "password_confirmation",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "department_id",
+									"value": "1",
+									"type": "text"
+								},
+								{
+									"key": "year_id",
+									"value": "1",
+									"type": "text"
+								},
+								{
+									"key": "referral_code",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"description": "Optional profile photo (multipart)",
+									"type": "file",
+									"src": ""
+								}
+							]
 						},
+						"description": "multipart/form-data with optional image. JSON without file still works.",
 						"url": "{{base_url}}/auth/student/register"
 					}
 				},
@@ -315,7 +388,7 @@
 						{
 							"name": "Update Profile",
 							"request": {
-								"method": "PUT",
+								"method": "POST",
 								"header": [
 									{
 										"key": "Accept",
@@ -350,27 +423,13 @@
 											"type": "text"
 										},
 										{
-											"key": "current_password",
-											"value": "old_password",
-											"type": "text"
-										},
-										{
-											"key": "password",
-											"value": "new_password",
-											"type": "text"
-										},
-										{
-											"key": "password_confirmation",
-											"value": "new_password",
-											"type": "text"
-										},
-										{
 											"key": "image",
 											"type": "file",
 											"src": ""
 										}
 									]
 								},
+								"description": "Use POST for multipart (PUT multipart is often empty on PHP). JSON body: use PUT or POST with application/json. Omit empty password fields when not changing password.",
 								"url": "{{base_url}}/student/profile"
 							}
 						},
@@ -384,18 +443,37 @@
 										"value": "application/json"
 									},
 									{
-										"key": "Content-Type",
-										"value": "application/json"
-									},
-									{
 										"key": "Authorization",
 										"value": "Bearer {{student_token}}"
 									}
 								],
 								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"department_id\": 1,\n  \"year_id\": 1,\n  \"phone\": \"07501234567\"\n}"
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "department_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "year_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "phone",
+											"value": "07501234567",
+											"type": "text"
+										},
+										{
+											"key": "image",
+											"description": "Optional profile photo",
+											"type": "file",
+											"src": ""
+										}
+									]
 								},
+								"description": "multipart/form-data: required department_id, year_id; optional phone and image. JSON body still accepted if no file upload.",
 								"url": "{{base_url}}/student/profile/complete"
 							}
 						}
@@ -1950,7 +2028,7 @@
 									}
 								],
 								"url": {
-									"raw": "{{base_url}}/admin/students?search=&department_id=&year_id=&active=",
+									"raw": "{{base_url}}/admin/students?page=1&search=&department_id=&year_id=&active=",
 									"host": [
 										"{{base_url}}"
 									],
@@ -1960,21 +2038,29 @@
 									],
 									"query": [
 										{
+											"key": "page",
+											"value": "1",
+											"description": "Pagination page (20 per page)"
+										},
+										{
 											"key": "search",
 											"value": "",
-											"description": "Search by name/email/phone"
+											"description": "Search full_name, email, phone (partial match)"
 										},
 										{
 											"key": "department_id",
-											"value": ""
+											"value": "",
+											"description": "Filter by student department ID"
 										},
 										{
 											"key": "year_id",
-											"value": ""
+											"value": "",
+											"description": "Filter by academic year ID"
 										},
 										{
 											"key": "active",
-											"value": ""
+											"value": "",
+											"description": "true = active, false = banned/inactive (omit for all)"
 										}
 									]
 								}
@@ -2150,7 +2236,38 @@
 										"value": "Bearer {{admin_token}}"
 									}
 								],
-								"url": "{{base_url}}/admin/instructors"
+								"url": {
+									"raw": "{{base_url}}/admin/instructors?page=1&search=&department_id=&active=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"instructors"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Pagination page (20 per page)"
+										},
+										{
+											"key": "search",
+											"value": "",
+											"description": "Search full_name, email, phone (partial match)"
+										},
+										{
+											"key": "department_id",
+											"value": "",
+											"description": "Instructors with at least one course whose subject belongs to this department"
+										},
+										{
+											"key": "active",
+											"value": "",
+											"description": "true|false — account active / suspended (omit for all)"
+										}
+									]
+								}
 							}
 						},
 						{
@@ -2310,7 +2427,53 @@
 										"value": "Bearer {{admin_token}}"
 									}
 								],
-								"url": "{{base_url}}/admin/courses"
+								"url": {
+									"raw": "{{base_url}}/admin/courses?page=1&keyword=&status=&instructor_id=&subject_id=&department_id=&active=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"courses"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Pagination page (20 per page)"
+										},
+										{
+											"key": "keyword",
+											"value": "",
+											"description": "Search course title and description (partial match)"
+										},
+										{
+											"key": "status",
+											"value": "",
+											"description": "draft | pending | published (omit for all)"
+										},
+										{
+											"key": "instructor_id",
+											"value": "",
+											"description": "Filter by instructor user ID"
+										},
+										{
+											"key": "subject_id",
+											"value": "",
+											"description": "Filter by subject (category) ID"
+										},
+										{
+											"key": "department_id",
+											"value": "",
+											"description": "Filter by subject's department ID"
+										},
+										{
+											"key": "active",
+											"value": "",
+											"description": "true|false — course listed / hidden (omit for all)"
+										}
+									]
+								}
 							}
 						},
 						{

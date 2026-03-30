@@ -1,26 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Filter, Edit, Trash2, Eye, UserMinus } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, UserMinus } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
-import { teachersAPI } from '../../services/api';
+import { teachersAPI, academicAPI } from '../../services/api';
+import '../students/StudentsList.css';
 
 const TeachersList = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [departmentId, setDepartmentId] = useState('');
+    const [activeFilter, setActiveFilter] = useState('');
+    const [departments, setDepartments] = useState([]);
     const [teachers, setTeachers] = useState([]);
     const [pagination, setPagination] = useState({ current_page: 1, last_page: 1 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const fetchTeachers = async (page = 1) => {
+    useEffect(() => {
+        const id = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
+        return () => clearTimeout(id);
+    }, [searchInput]);
+
+    useEffect(() => {
+        academicAPI.getDepartments({ per_page: 500 }).then((res) => {
+            setDepartments(res.data || []);
+        }).catch(() => setDepartments([]));
+    }, []);
+
+    const fetchTeachers = useCallback(async (page = 1) => {
         try {
             setLoading(true);
             setError('');
-            const res = await teachersAPI.getAll({ page });
+            const params = { page };
+            if (debouncedSearch) params.search = debouncedSearch;
+            if (departmentId) params.department_id = departmentId;
+            if (activeFilter === 'active') params.active = true;
+            else if (activeFilter === 'inactive') params.active = false;
+            const res = await teachersAPI.getAll(params);
             setTeachers(res.data || []);
             setPagination({ current_page: res.current_page, last_page: res.last_page });
         } catch (e) {
@@ -30,7 +51,11 @@ const TeachersList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [debouncedSearch, departmentId, activeFilter]);
+
+    useEffect(() => {
+        fetchTeachers(1);
+    }, [fetchTeachers]);
 
     const handleToggleSuspend = async (teacherId) => {
         try {
@@ -53,11 +78,6 @@ const TeachersList = () => {
         }
     };
 
-    useEffect(() => {
-        fetchTeachers(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     return (
         <div className="students-page">
             <div className="page-header">
@@ -75,17 +95,35 @@ const TeachersList = () => {
             </div>
 
             <Card>
-                <div className="table-controls">
+                <div className="table-controls table-controls-filters">
                     <Input
                         placeholder={t('common.search')}
                         icon={<Search size={18} />}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="search-input"
                     />
-                    <Button variant="outline" icon={<Filter size={18} />}>
-                        {t('common.filter')}
-                    </Button>
+                    <select
+                        className="filter-select"
+                        value={departmentId}
+                        onChange={(e) => setDepartmentId(e.target.value)}
+                        aria-label={t('nav.departments')}
+                    >
+                        <option value="">{t('nav.departments')}: {t('common.all')}</option>
+                        {departments.map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="filter-select"
+                        value={activeFilter}
+                        onChange={(e) => setActiveFilter(e.target.value)}
+                        aria-label={t('common.status')}
+                    >
+                        <option value="">{t('common.status')}: {t('common.all')}</option>
+                        <option value="active">{t('coupon.activeOnly')}</option>
+                        <option value="inactive">{t('coupon.inactiveOnly')}</option>
+                    </select>
                 </div>
 
                 {loading ? (

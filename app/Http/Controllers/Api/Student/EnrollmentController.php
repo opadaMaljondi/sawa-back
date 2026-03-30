@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Note;
 use App\Services\CouponService;
+use App\Services\CourseCommissionService;
 use App\Services\ReferralService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -112,6 +113,8 @@ class EnrollmentController extends Controller
 
             $finalPrice = $price;
 
+            $commission = CourseCommissionService::splitForCourse($course, $finalPrice);
+
             // Check wallet balance
             if (!$this->walletService->hasEnoughBalance($student->id, $finalPrice)) {
                 return response()->json([
@@ -128,24 +131,30 @@ class EnrollmentController extends Controller
                 "Enrollment: {$course->title}",
                 [
                     'course_id' => $course->id,
-                    'type'      => $request->type,
+                    'type' => $request->type,
+                    'admin_commission_percent' => $commission['admin_commission_percent'],
+                    'platform_amount' => $commission['platform_amount'],
+                    'instructor_amount' => $commission['instructor_amount'],
                 ]
             );
 
             // Create enrollment record
             $enrollment = Enrollment::create([
-                'student_id'     => $student->id,
-                'course_id'      => $course->id,
-                'type'           => $request->type,
-                'section_id'     => $request->section_id ?? null,
-                'lesson_id'      => $request->lesson_id ?? null,
-                'note_id'        => $request->note_id ?? null,
+                'student_id' => $student->id,
+                'course_id' => $course->id,
+                'type' => $request->type,
+                'section_id' => $request->section_id ?? null,
+                'lesson_id' => $request->lesson_id ?? null,
+                'note_id' => $request->note_id ?? null,
                 'original_price' => $originalPrice,
-                'discount'       => $discount,
-                'final_price'    => $finalPrice,
-                'coupon_code'    => $couponCode,
-                'active'         => true,
-                'enrolled_at'    => now(),
+                'discount' => $discount,
+                'final_price' => $finalPrice,
+                'admin_commission_percent' => $commission['admin_commission_percent'],
+                'platform_amount' => $commission['platform_amount'],
+                'instructor_amount' => $commission['instructor_amount'],
+                'coupon_code' => $couponCode,
+                'active' => true,
+                'enrolled_at' => now(),
             ]);
 
             // Apply coupon usage record
@@ -174,8 +183,13 @@ class EnrollmentController extends Controller
             }
 
             return response()->json([
-                'message'    => 'Enrolled successfully.',
+                'message' => 'Enrolled successfully.',
                 'enrollment' => $enrollment->load(['course', 'section', 'lesson', 'note']),
+                'commission' => [
+                    'admin_commission_percent' => $commission['admin_commission_percent'],
+                    'platform_amount' => $commission['platform_amount'],
+                    'instructor_amount' => $commission['instructor_amount'],
+                ],
             ], 201);
         });
     }
