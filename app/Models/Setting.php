@@ -21,6 +21,10 @@ class Setting extends Model
         'address' => ['type' => 'string', 'description' => 'العنوان'],
         'maintenance_mode' => ['type' => 'boolean', 'description' => 'وضع الصيانة'],
         'allow_registration' => ['type' => 'boolean', 'description' => 'السماح بالتسجيل الجديد'],
+        'referral_program_enabled' => ['type' => 'boolean', 'description' => 'تفعيل نظام الإحالة'],
+        'referral_first_subscription_discount_percent' => ['type' => 'number', 'description' => 'خصم أول اشتراك للمدعو (% من السعر، 0 لتعطيل واستخدام المبلغ الثابت)'],
+        'referral_first_subscription_discount_fixed' => ['type' => 'number', 'description' => 'خصم أول اشتراك للمدعو (مبلغ ثابت ل.س إذا كانت النسبة 0)'],
+        'referral_enrollment_bonus' => ['type' => 'number', 'description' => 'مكافأة محفظة المحيل عند أول اشتراك للمدعو (ل.س)'],
     ];
 
     protected $fillable = [

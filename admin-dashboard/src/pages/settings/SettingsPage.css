@@ -188,3 +188,11 @@
 [dir="rtl"] .settings-tab-btn {
     text-align: right;
 }
+
+.settings-hint {
+    grid-column: 1 / -1;
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}

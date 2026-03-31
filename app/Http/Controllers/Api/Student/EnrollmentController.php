@@ -94,10 +94,16 @@ class EnrollmentController extends Controller
             );
 
             $originalPrice = $price;
-            $discount      = 0;
-            $couponCode    = null;
+            $discount           = 0;
+            $referralDiscount   = $this->referralService->computeFirstSubscriptionDiscount($student->id, $price);
+            $couponCode         = null;
 
-            // Apply coupon if provided
+            if ($referralDiscount > 0) {
+                $discount += $referralDiscount;
+                $price = max(0, round($price - $referralDiscount, 2));
+            }
+
+            // Apply coupon if provided (on price after referral discount)
             if ($request->coupon_code) {
                 $couponResult = $this->couponService->validateCoupon(
                     $request->coupon_code,
@@ -105,7 +111,7 @@ class EnrollmentController extends Controller
                     $price
                 );
                 if ($couponResult['valid']) {
-                    $discount   = $couponResult['discount'];
+                    $discount   += $couponResult['discount'];
                     $price      = $couponResult['final_amount'];
                     $couponCode = $request->coupon_code;
                 }
@@ -132,6 +138,7 @@ class EnrollmentController extends Controller
                 [
                     'course_id' => $course->id,
                     'type' => $request->type,
+                    'referral_discount' => $referralDiscount,
                     'admin_commission_percent' => $commission['admin_commission_percent'],
                     'platform_amount' => $commission['platform_amount'],
                     'instructor_amount' => $commission['instructor_amount'],
@@ -148,6 +155,7 @@ class EnrollmentController extends Controller
                 'note_id' => $request->note_id ?? null,
                 'original_price' => $originalPrice,
                 'discount' => $discount,
+                'referral_discount' => $referralDiscount,
                 'final_price' => $finalPrice,
                 'admin_commission_percent' => $commission['admin_commission_percent'],
                 'platform_amount' => $commission['platform_amount'],

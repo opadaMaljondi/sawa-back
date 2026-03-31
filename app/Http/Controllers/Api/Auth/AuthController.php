@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ReferralService;
 use App\Support\StudentWalletQr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,11 +17,12 @@ class AuthController extends Controller
     public function registerStudent(Request $request)
     {
         $data = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'email'     => 'required|email|unique:users,email',
-            'phone'     => 'required|string|unique:users,phone',
-            'password'  => 'required|string|min:6|confirmed',
-            'image'     => 'nullable|image',
+            'full_name'     => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'phone'         => 'required|string|unique:users,phone',
+            'password'      => 'required|string|min:6|confirmed',
+            'referral_code' => 'nullable|string|max:32',
+            'image'         => 'nullable|image',
         ]);
 
         $imagePath = null;
@@ -49,6 +51,10 @@ class AuthController extends Controller
             'total_spent' => 0,
             'active' => true,
         ]);
+
+        if (! empty($data['referral_code'] ?? null)) {
+            app(ReferralService::class)->applyReferralCode($user->id, $data['referral_code']);
+        }
 
         $user->load(['wallet', 'department', 'year']);
 

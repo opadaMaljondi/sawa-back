@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Globe, Mail, Shield, Save, Loader2, Sun, Moon, Monitor } from 'lucide-react';
+import { Settings, Globe, Mail, Shield, Save, Loader2, Sun, Moon, Monitor, Gift } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -17,7 +17,18 @@ const ALLOWED_SETTING_KEYS = [
     'address',
     'maintenance_mode',
     'allow_registration',
+    'referral_program_enabled',
+    'referral_first_subscription_discount_percent',
+    'referral_first_subscription_discount_fixed',
+    'referral_enrollment_bonus',
 ];
+
+const REFERRAL_DEFAULTS = {
+    referral_program_enabled: 'true',
+    referral_first_subscription_discount_percent: '0',
+    referral_first_subscription_discount_fixed: '0',
+    referral_enrollment_bonus: '0',
+};
 
 const SettingsPage = () => {
     const { t } = useTranslation();
@@ -44,7 +55,7 @@ const SettingsPage = () => {
             res.forEach(item => {
                 data[item.key] = item.value;
             });
-            setFormData(data);
+            setFormData({ ...REFERRAL_DEFAULTS, ...data });
         } catch (e) {
             console.error(e);
             setMessage({ type: 'error', text: 'فشل تحميل الإعدادات' });
@@ -84,6 +95,7 @@ const SettingsPage = () => {
         { id: 'general', icon: <Globe size={18} />, label: t('settings.general') },
         { id: 'contact', icon: <Mail size={18} />, label: t('settings.contact') },
         { id: 'system', icon: <Shield size={18} />, label: t('settings.system') },
+        { id: 'referral', icon: <Gift size={18} />, label: t('settings.referral') },
     ];
 
     const renderTabContent = () => {
@@ -131,6 +143,51 @@ const SettingsPage = () => {
                             <Input
                                 value={formData.address || ''}
                                 onChange={(e) => handleChange('address', e.target.value)}
+                            />
+                        </div>
+                    </div>
+                );
+            case 'referral':
+                return (
+                    <div className="settings-form-grid">
+                        <p className="settings-hint">{t('settings.referralHint')}</p>
+                        <div className="form-item flex-row">
+                            <label>{t('settings.referralProgramEnabled')}</label>
+                            <input
+                                type="checkbox"
+                                checked={formData.referral_program_enabled === 'true'}
+                                onChange={(e) => handleChange('referral_program_enabled', e.target.checked.toString())}
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.referralFirstSubDiscountPercent')}</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={formData.referral_first_subscription_discount_percent ?? '0'}
+                                onChange={(e) => handleChange('referral_first_subscription_discount_percent', e.target.value)}
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.referralFirstSubDiscountFixed')}</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.referral_first_subscription_discount_fixed ?? '0'}
+                                onChange={(e) => handleChange('referral_first_subscription_discount_fixed', e.target.value)}
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.referralEnrollmentBonus')}</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={ formData.referral_enrollment_bonus ?? '0'}
+                                onChange={(e) => handleChange('referral_enrollment_bonus', e.target.value)}
                             />
                         </div>
                     </div>

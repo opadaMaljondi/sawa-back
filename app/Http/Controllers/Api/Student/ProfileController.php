@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Year;
+use App\Services\ReferralService;
 use App\Support\StudentWalletQr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,6 +19,7 @@ class ProfileController extends Controller
     public function show(Request $request)
     {
         $user = $request->user()->load(['department', 'year', 'wallet']);
+        $this->ensureStudentReferralCode($user);
 
         return response()->json([
             'user'   => $user,
@@ -92,9 +95,12 @@ class ProfileController extends Controller
 
         $user->update($update);
 
+        $user = $user->fresh(['department', 'year', 'wallet']);
+        $this->ensureStudentReferralCode($user);
+
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user' => $user->fresh(['department', 'year', 'wallet']),
+            'user' => $user,
             'wallet_qr' => StudentWalletQr::qrPayload($user->id),
         ]);
     }
@@ -166,11 +172,27 @@ class ProfileController extends Controller
             ]);
         }
         $user->load(['department', 'year', 'wallet']);
+        $this->ensureStudentReferralCode($user);
 
         return response()->json([
             'message' => 'Profile completed successfully.',
             'user' => $user,
             'wallet_qr' => StudentWalletQr::qrPayload($user->id),
         ]);
+    }
+
+    /**
+     * Persist and expose referral_code for students (lazy generation).
+     */
+    private function ensureStudentReferralCode(User $user): void
+    {
+        if ($user->type !== 'student') {
+            return;
+        }
+        if ($user->referral_code) {
+            return;
+        }
+        app(ReferralService::class)->generateReferralCode($user->id);
+        $user->refresh();
     }
 }

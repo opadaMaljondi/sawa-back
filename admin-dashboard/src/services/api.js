@@ -251,6 +251,12 @@ export const permissionsAPI = {
   syncPermissions: (id, permissions) => api.post(`/admin/roles/${id}/permissions`, { permissions }),
 };
 
+// Referrals (admin)
+export const referralsAPI = {
+  list: (params) => api.get('/admin/referrals', { params }),
+  stats: () => api.get('/admin/referrals/stats'),
+};
+
 // Settings
 export const settingsAPI = {
   getAll: () => api.get('/admin/settings'),

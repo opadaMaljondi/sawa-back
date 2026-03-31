@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Api\Admin\InstructorController as AdminInstructorController;
 use App\Http\Controllers\Api\Admin\NoteController as AdminNoteController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Api\Admin\ReferralController as AdminReferralController;
 use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Api\Admin\ReportController;
@@ -330,6 +331,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('subscriptions/{id}', [AdminSubscriptionController::class, 'show']);
     Route::post('subscriptions/{id}/toggle-status', [AdminSubscriptionController::class, 'toggleStatus']);
     Route::post('subscriptions/{id}/refund', [AdminSubscriptionController::class, 'refund']);
+
+    // Referrals (admin dashboard) — `/stats` before list if you later add `referrals/{id}`
+    Route::get('referrals/stats', [AdminReferralController::class, 'stats']);
+    Route::get('referrals', [AdminReferralController::class, 'index']);
 
     // Finance aggregates (admin dashboard)
     Route::get('finance/platform-totals', [AdminFinanceController::class, 'platformTotals']);

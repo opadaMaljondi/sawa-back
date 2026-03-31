@@ -27,6 +27,7 @@ import BannersPage from './pages/banners/Banners';
 import CouponManagement from './pages/coupons/CouponManagement';
 import RolesAndPermissions from './pages/permissions/RolesAndPermissions';
 import FinanceManagement from './pages/finance/FinanceManagement';
+import ReferralsPage from './pages/referrals/ReferralsPage';
 import WalletQrScanPage from './pages/wallet/WalletQrScanPage';
 import Login from './pages/auth/Login';
 import './assets/styles/index.css';
@@ -96,6 +97,7 @@ function App() {
                 <Route path="courses/:id" element={<CourseDetailsRoute />} />
                 <Route path="courses/:id/edit" element={<CourseForm />} />
                 <Route path="coupons" element={<CouponManagement />} />
+                <Route path="referrals" element={<ReferralsPage />} />
                 <Route path="courses/:courseId/lessons/:lessonId" element={<VideoPlayer />} />
 
                 {/* Academic structure */}

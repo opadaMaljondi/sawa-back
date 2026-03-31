@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ReferralService;
 use App\Support\StudentWalletQr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -185,6 +186,11 @@ class StudentAuthController extends Controller
             $user->load('wallet');
         }
         $user->load(['department', 'year']);
+
+        if ($user->type === 'student' && ! $user->referral_code) {
+            app(ReferralService::class)->generateReferralCode($user->id);
+            $user->refresh();
+        }
 
         return response()->json([
             'user' => $user,

@@ -1,0 +1,133 @@
+.referrals-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.referrals-page .inline-icon {
+  flex-shrink: 0;
+}
+
+.referrals-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.referrals-stat-card {
+  padding: 1rem;
+  text-align: center;
+}
+
+.referrals-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary-600, #2563eb);
+}
+
+.referrals-stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+  margin-top: 0.25rem;
+}
+
+.referrals-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.referrals-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-primary, #e2e8f0);
+}
+
+.referrals-search {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.referrals-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-primary, #e2e8f0);
+  border-radius: 8px;
+  background: var(--bg-secondary, #f8fafc);
+  cursor: pointer;
+}
+
+.referrals-filter {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary, #e2e8f0);
+  background: var(--bg-primary, #fff);
+}
+
+.referrals-error {
+  padding: 0.75rem 1rem;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.referrals-table-wrap {
+  overflow-x: auto;
+}
+
+.referrals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.referrals-table th,
+.referrals-table td {
+  padding: 0.75rem 1rem;
+  text-align: start;
+  border-bottom: 1px solid var(--border-primary, #e2e8f0);
+}
+
+.referrals-table th {
+  font-weight: 600;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.referrals-table .muted {
+  color: var(--text-secondary, #64748b);
+}
+
+.referrals-empty {
+  text-align: center;
+  color: var(--text-secondary, #64748b);
+  padding: 2rem !important;
+}
+
+.referrals-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.referrals-pagination button {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary, #e2e8f0);
+  background: var(--bg-primary, #fff);
+  cursor: pointer;
+}
+
+.referrals-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

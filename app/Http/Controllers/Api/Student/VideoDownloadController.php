@@ -64,7 +64,9 @@ class VideoDownloadController extends Controller
                 $errorMessage = $e->getMessage();
                 $isBotChallenge = str_contains(strtolower($errorMessage), 'blocked anonymous extraction')
                     || str_contains(strtolower($errorMessage), 'not a bot')
-                    || str_contains(strtolower($errorMessage), 'blocked extraction');
+                    || str_contains(strtolower($errorMessage), 'blocked extraction')
+                    || str_contains(strtolower($errorMessage), 'yt_dlp_cookies is set but file was not found')
+                    || str_contains(strtolower($errorMessage), 'yt_dlp_cookies file is not readable');
 
                 return response()->json([
                     'message' => $isBotChallenge

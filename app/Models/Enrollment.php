@@ -18,6 +18,7 @@ class Enrollment extends Model
         'note_id',
         'original_price',
         'discount',
+        'referral_discount',
         'final_price',
         'admin_commission_percent',
         'platform_amount',
@@ -33,6 +34,7 @@ class Enrollment extends Model
     protected $casts = [
         'original_price' => 'decimal:2',
         'discount'       => 'decimal:2',
+        'referral_discount' => 'decimal:2',
         'final_price'    => 'decimal:2',
         'admin_commission_percent' => 'decimal:2',
         'platform_amount' => 'decimal:2',

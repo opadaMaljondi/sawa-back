@@ -60,7 +60,28 @@
         "settings": "Settings",
         "finance": "Finance & wallets",
         "financeCenter": "Wallet & earnings",
-        "coupons": "Coupon management"
+        "coupons": "Coupon management",
+        "referrals": "Referrals"
+    },
+    "referrals": {
+        "title": "Referral program",
+        "subtitle": "Track invites and referral bonuses",
+        "total": "Total referrals",
+        "inviter": "Inviter",
+        "invited": "Invited user",
+        "code": "Code",
+        "bonusStatus": "Bonus status",
+        "bonusAmount": "Enrollment bonus (recorded)",
+        "date": "Date",
+        "searchPlaceholder": "Search by name, email, or code",
+        "allStatuses": "All statuses",
+        "empty": "No referrals yet",
+        "loadError": "Failed to load referrals",
+        "status": {
+            "pending": "Pending (no first purchase yet)",
+            "earned": "Earned",
+            "paid": "Paid (referrer credited)"
+        }
     },
     "coupon": {
         "title": "Coupon management",
@@ -368,7 +389,13 @@
         "maintenanceMode": "Maintenance Mode",
         "allowRegistration": "Allow New Registration",
         "saveSuccess": "Settings saved successfully",
-        "saveError": "An error occurred while saving"
+        "saveError": "An error occurred while saving",
+        "referral": "Referrals",
+        "referralHint": "Invited users get a discount on their first subscription only. The referrer receives a wallet bonus only after that first purchase. No signup bonuses.",
+        "referralProgramEnabled": "Enable referral program",
+        "referralFirstSubDiscountPercent": "First subscription discount for invited user (%)",
+        "referralFirstSubDiscountFixed": "First subscription discount — fixed (SYP), if percent is 0",
+        "referralEnrollmentBonus": "Referrer wallet bonus after invited user's first subscription (SYP)"
     },
     "dashboard": {
         "welcome": "Welcome to Dashboard",

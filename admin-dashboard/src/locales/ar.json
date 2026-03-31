@@ -60,7 +60,28 @@
         "settings": "الإعدادات",
         "finance": "المالية والمحافظ",
         "financeCenter": "إدارة المحافظ والأرباح",
-        "coupons": "إدارة الكوبونات"
+        "coupons": "إدارة الكوبونات",
+        "referrals": "الإحالات"
+    },
+    "referrals": {
+        "title": "برنامج الإحالة",
+        "subtitle": "متابعة الدعوات ومكافآت الإحالة",
+        "total": "إجمالي الإحالات",
+        "inviter": "المحيل",
+        "invited": "المدعو",
+        "code": "الرمز",
+        "bonusStatus": "حالة المكافأة",
+        "bonusAmount": "مبلغ مكافأة أول اشتراك (مسجل)",
+        "date": "التاريخ",
+        "searchPlaceholder": "بحث بالاسم، البريد، أو الرمز",
+        "allStatuses": "كل الحالات",
+        "empty": "لا توجد إحالات بعد",
+        "loadError": "فشل تحميل الإحالات",
+        "status": {
+            "pending": "بانتظار أول اشتراك",
+            "earned": "مستحقة",
+            "paid": "دُفعت للمحيل"
+        }
     },
     "coupon": {
         "title": "إدارة الكوبونات",
@@ -368,7 +389,13 @@
         "maintenanceMode": "وضع الصيانة",
         "allowRegistration": "السماح بالتسجيل الجديد",
         "saveSuccess": "تم حفظ الإعدادات بنجاح",
-        "saveError": "حدث خطأ أثناء الحفظ"
+        "saveError": "حدث خطأ أثناء الحفظ",
+        "referral": "الإحالات",
+        "referralHint": "المدعو يحصل على خصم على أول اشتراك فقط. المحيل يحصل على مكافأة محفظة بعد أول شراء للمدعو فقط. لا مكافآت عند التسجيل.",
+        "referralProgramEnabled": "تفعيل برنامج الإحالة",
+        "referralFirstSubDiscountPercent": "خصم أول اشتراك للمدعو (%)",
+        "referralFirstSubDiscountFixed": "خصم أول اشتراك — مبلغ ثابت (ل.س) إذا كانت النسبة 0",
+        "referralEnrollmentBonus": "مكافأة محفظة المحيل بعد أول اشتراك للمدعو (ل.س)"
     },
     "dashboard": {
         "welcome": "مرحباً بك في لوحة التحكم",
