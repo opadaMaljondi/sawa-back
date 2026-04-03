@@ -25,6 +25,12 @@ class Setting extends Model
         'referral_first_subscription_discount_percent' => ['type' => 'number', 'description' => 'خصم أول اشتراك للمدعو (% من السعر، 0 لتعطيل واستخدام المبلغ الثابت)'],
         'referral_first_subscription_discount_fixed' => ['type' => 'number', 'description' => 'خصم أول اشتراك للمدعو (مبلغ ثابت ل.س إذا كانت النسبة 0)'],
         'referral_enrollment_bonus' => ['type' => 'number', 'description' => 'مكافأة محفظة المحيل عند أول اشتراك للمدعو (ل.س)'],
+        'support_phone' => ['type' => 'string', 'description' => 'هاتف الدعم (تطبيق الطالب)'],
+        'support_email' => ['type' => 'string', 'description' => 'بريد الدعم (تطبيق الطالب)'],
+        'support_whatsapp' => ['type' => 'string', 'description' => 'واتساب الدعم'],
+        'support_telegram' => ['type' => 'string', 'description' => 'تيليجرام الدعم'],
+        'privacy_policy' => ['type' => 'string', 'description' => 'سياسة الخصوصية (تطبيق الطالب)'],
+        'terms_and_conditions' => ['type' => 'string', 'description' => 'الشروط والأحكام (تطبيق الطالب)'],
     ];
 
     protected $fillable = [

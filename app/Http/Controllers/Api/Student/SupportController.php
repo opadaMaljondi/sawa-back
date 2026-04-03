@@ -15,10 +15,12 @@ class SupportController extends Controller
     public function info()
     {
         return response()->json([
-            'support_phone'     => Setting::get('support_phone'),
-            'support_email'     => Setting::get('support_email'),
-            'support_whatsapp'  => Setting::get('support_whatsapp'),
-            'support_telegram'  => Setting::get('support_telegram'),
+            'support_phone'        => Setting::get('support_phone'),
+            'support_email'        => Setting::get('support_email'),
+            'support_whatsapp'     => Setting::get('support_whatsapp'),
+            'support_telegram'     => Setting::get('support_telegram'),
+            'privacy_policy'       => Setting::get('privacy_policy', ''),
+            'terms_and_conditions' => Setting::get('terms_and_conditions', ''),
         ]);
     }
 

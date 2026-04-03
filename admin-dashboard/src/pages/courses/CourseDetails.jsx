@@ -9,6 +9,11 @@ import Modal from '../../components/common/Modal';
 import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
+/** Chunk size (bytes); each request should stay under PHP post_max_filesize. */
+const VIDEO_CHUNK_BYTES = 4 * 1024 * 1024;
+/** Local/aws files larger than this use chunked upload. */
+const VIDEO_CHUNK_THRESHOLD = 4 * 1024 * 1024;
+
 const CourseDetails = () => {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -286,39 +291,93 @@ const CourseDetails = () => {
   const submitLesson = async (e) => {
     e.preventDefault();
     setLessonError('');
-    if (!lessonFile && !lessonForm.video_url) {
+    const needsUploadOnly = lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws';
+    if (needsUploadOnly && !lessonFile) {
+      setLessonError('اختر ملف الفيديو للرفع');
+      return;
+    }
+    if (!needsUploadOnly && !lessonFile && !lessonForm.video_url) {
       setLessonError('اختر ملف الفيديو أو أدخل رابط يوتيوب');
       return;
     }
     try {
       setLessonLoading(true);
       setUploadProgress(0);
-      const fd = new FormData();
-      fd.append('course_id', course.id);
-      if (lessonForm.section_id) fd.append('section_id', lessonForm.section_id);
-      fd.append('title', lessonForm.title);
-      fd.append('description', lessonForm.description || '');
-      fd.append('is_free', lessonForm.is_free ? '1' : '0');
-      fd.append('order', lessonForm.order);
-      fd.append('duration', lessonForm.duration || 0);
-      fd.append('price', lessonForm.price || 0);
-      fd.append('video_provider', lessonForm.video_provider);
-      fd.append('can_download', lessonForm.can_download ? '1' : '0');
-      fd.append('can_purchase_alone', lessonForm.can_purchase_alone ? '1' : '0');
 
-      if (lessonFile) {
-        fd.append('video', lessonFile);
-      } else if (lessonForm.video_url) {
-        fd.append('youtube_url', lessonForm.video_url);
+      const useChunked =
+        needsUploadOnly &&
+        lessonFile &&
+        lessonFile.size > VIDEO_CHUNK_THRESHOLD;
+
+      if (useChunked) {
+        const uploadId = crypto.randomUUID();
+        const totalChunks = Math.ceil(lessonFile.size / VIDEO_CHUNK_BYTES) || 1;
+        for (let i = 0; i < totalChunks; i += 1) {
+          const start = i * VIDEO_CHUNK_BYTES;
+          const blob = lessonFile.slice(start, start + VIDEO_CHUNK_BYTES);
+          const chunkFd = new FormData();
+          chunkFd.append('upload_id', uploadId);
+          chunkFd.append('chunk_index', String(i));
+          chunkFd.append('total_chunks', String(totalChunks));
+          chunkFd.append('original_name', lessonFile.name);
+          chunkFd.append('chunk', blob, lessonFile.name);
+          await videosAPI.uploadChunk(chunkFd, (ev) => {
+            if (ev.total) {
+              const part = (i + ev.loaded / ev.total) / totalChunks;
+              setUploadProgress(Math.min(99, Math.round(part * 100)));
+            }
+          });
+        }
+
+        const fd = new FormData();
+        fd.append('upload_id', uploadId);
+        fd.append('total_chunks', String(totalChunks));
+        fd.append('original_name', lessonFile.name);
+        fd.append('video_provider', lessonForm.video_provider);
+        fd.append('course_id', course.id);
+        if (lessonForm.section_id) fd.append('section_id', lessonForm.section_id);
+        fd.append('title', lessonForm.title);
+        fd.append('description', lessonForm.description || '');
+        fd.append('is_free', lessonForm.is_free ? '1' : '0');
+        fd.append('order', lessonForm.order);
+        fd.append('duration', lessonForm.duration || 0);
+        fd.append('price', lessonForm.price || 0);
+        fd.append('can_download', lessonForm.can_download ? '1' : '0');
+        fd.append('can_purchase_alone', lessonForm.can_purchase_alone ? '1' : '0');
+        if (lessonThumbnail) fd.append('thumbnail', lessonThumbnail);
+
+        await videosAPI.completeChunkUpload(fd, (ev) => {
+          if (ev.total) setUploadProgress(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
+        });
+      } else {
+        const fd = new FormData();
+        fd.append('course_id', course.id);
+        if (lessonForm.section_id) fd.append('section_id', lessonForm.section_id);
+        fd.append('title', lessonForm.title);
+        fd.append('description', lessonForm.description || '');
+        fd.append('is_free', lessonForm.is_free ? '1' : '0');
+        fd.append('order', lessonForm.order);
+        fd.append('duration', lessonForm.duration || 0);
+        fd.append('price', lessonForm.price || 0);
+        fd.append('video_provider', lessonForm.video_provider);
+        fd.append('can_download', lessonForm.can_download ? '1' : '0');
+        fd.append('can_purchase_alone', lessonForm.can_purchase_alone ? '1' : '0');
+
+        if (lessonFile) {
+          fd.append('video', lessonFile);
+        } else if (lessonForm.video_url) {
+          fd.append('youtube_url', lessonForm.video_url);
+        }
+
+        if (lessonThumbnail) {
+          fd.append('thumbnail', lessonThumbnail);
+        }
+
+        await videosAPI.upload(fd, (ev) => {
+          if (ev.total) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+        });
       }
 
-      if (lessonThumbnail) {
-        fd.append('thumbnail', lessonThumbnail);
-      }
-
-      await videosAPI.upload(fd, (e) => {
-        if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      });
       setUploadProgress(0);
       setLessonModalOpen(false);
       await loadCourse();
@@ -342,7 +401,8 @@ const CourseDetails = () => {
       duration: lesson.duration || 0,
       price: lesson.price ?? '',
       video_provider: lesson.video_provider || 'youtube',
-      video_url: lesson.video_provider === 'youtube' ? (lesson.video_reference || '') : '',
+      video_url:
+        lesson.video_provider === 'youtube' ? lesson.video_reference || '' : '',
       can_download: !!lesson.can_download,
       can_purchase_alone: !!lesson.can_purchase_alone
     });
@@ -1263,6 +1323,7 @@ const CourseDetails = () => {
                     >
                       <option value="youtube">YouTube</option>
                       <option value="local">Local Storage</option>
+                      <option value="aws">AWS S3</option>
                     </select>
                   </div>
                 </div>
@@ -1283,7 +1344,11 @@ const CourseDetails = () => {
                   )}
                   <div>
                     <label className="input-label">
-                      {lessonForm.video_provider === 'youtube' ? 'أو رفع ملف فيديو (لليوتيوب)' : 'رفع ملف فيديو (محلي)'}
+                      {lessonForm.video_provider === 'youtube'
+                        ? 'أو رفع ملف فيديو (لليوتيوب)'
+                        : lessonForm.video_provider === 'aws'
+                          ? 'رفع ملف فيديو (AWS S3)'
+                          : 'رفع ملف فيديو (محلي)'}
                     </label>
                     <input
                       type="file"
@@ -1447,6 +1512,7 @@ const CourseDetails = () => {
                     >
                       <option value="youtube">YouTube</option>
                       <option value="local">Local Storage</option>
+                      <option value="aws">AWS S3</option>
                     </select>
                   </div>
                 </div>

@@ -36,34 +36,57 @@ class VideoController extends Controller
             'video' => 'required|file|mimes:mp4,avi,mov|max:10240', // 10GB max
             'is_free' => 'boolean',
             'order' => 'nullable|integer',
+            'video_provider' => 'nullable|in:youtube,local,aws',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($request->course_id);
 
+        $videoProvider = $request->input('video_provider', 'youtube');
+
         $tempPath = $request->file('video')->store('videos/temp', 'local');
         $fullTempPath = storage_path('app/' . $tempPath);
 
-        $videoId = $this->youtubeService->uploadVideo($fullTempPath, [
-            'title' => $request->title,
-            'description' => "Course: {$course->title}",
-            'privacy_status' => 'unlisted',
-        ]);
-
-        $videoProvider = 'youtube';
         $videoReference = null;
 
-        if ($videoId) {
-            $videoReference = $videoId;
-            Storage::delete($tempPath);
-        } else {
+        if ($videoProvider === 'aws') {
             $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $localFileName = Str::random(40) . '.' . $extension;
-            $localPath = "videos/lessons/course_{$course->id}/{$localFileName}";
-            Storage::disk('local')->put($localPath, file_get_contents($fullTempPath));
-            Storage::delete($tempPath);
-            $videoProvider = 'local';
+            $s3Path = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+            try {
+                Storage::disk('s3')->put($s3Path, file_get_contents($fullTempPath), ['visibility' => 'public']);
+            } catch (\Throwable $e) {
+                Storage::disk('local')->delete($tempPath);
+
+                return response()->json([
+                    'message' => 'Failed to upload video to S3: ' . $e->getMessage(),
+                ], 422);
+            }
+            Storage::disk('local')->delete($tempPath);
+            $videoReference = $s3Path;
+        } elseif ($videoProvider === 'local') {
+            $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
+            $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+            Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
+            Storage::disk('local')->delete($tempPath);
             $videoReference = $localPath;
+        } else {
+            $videoId = $this->youtubeService->uploadVideo($fullTempPath, [
+                'title' => $request->title,
+                'description' => "Course: {$course->title}",
+                'privacy_status' => 'unlisted',
+            ]);
+
+            if ($videoId) {
+                $videoReference = $videoId;
+                Storage::disk('local')->delete($tempPath);
+            } else {
+                $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
+                $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+                Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
+                Storage::disk('local')->delete($tempPath);
+                $videoProvider = 'local';
+                $videoReference = $localPath;
+            }
         }
 
         $lesson = Lesson::create([
@@ -77,15 +100,22 @@ class VideoController extends Controller
             'order' => (int) ($request->order ?? 1),
         ]);
 
-        $message = $videoProvider === 'youtube'
-            ? 'Video uploaded successfully. Waiting for admin approval.'
-            : 'Video saved locally. Waiting for admin approval. (YouTube: ' . ($this->youtubeService->getLastError() ?? 'not configured') . ')';
+        if ($videoProvider === 'youtube') {
+            $message = 'Video uploaded successfully. Waiting for admin approval.';
+        } elseif ($videoProvider === 'aws') {
+            $message = 'Video uploaded to S3. Waiting for admin approval.';
+        } else {
+            $message = 'Video saved locally. Waiting for admin approval.';
+            if ($request->input('video_provider') === 'youtube') {
+                $message .= ' (YouTube: ' . ($this->youtubeService->getLastError() ?? 'not configured') . ')';
+            }
+        }
 
         return response()->json([
             'message' => $message,
             'lesson' => $lesson,
             'video_provider' => $videoProvider,
-            'video_playback_url' => $videoProvider === 'youtube' ? $lesson->video_reference : null,
+            'video_playback_url' => $lesson->video_playback_url,
         ], 201);
     }
 
@@ -138,9 +168,12 @@ class VideoController extends Controller
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
-        // حذف من YouTube
         if ($lesson->video_provider === 'youtube') {
             $this->youtubeService->deleteVideo($lesson->video_reference);
+        } elseif ($lesson->video_provider === 'local' && $lesson->video_reference) {
+            Storage::disk('public')->delete($lesson->video_reference);
+        } elseif ($lesson->video_provider === 'aws' && $lesson->video_reference) {
+            Storage::disk('s3')->delete($lesson->video_reference);
         }
 
         $lesson->delete();

@@ -47,6 +47,9 @@ export const dashboardAPI = {
   topCourses: () => api.get('/admin/dashboard/top-courses'),
   recentEnrollments: () => api.get('/admin/dashboard/recent-enrollments'),
   couponStats: () => api.get('/admin/dashboard/coupon-stats'),
+  supportMessages: (params) => api.get('/admin/dashboard/support', { params }),
+  updateSupportStatus: (id, status) =>
+    api.put(`/admin/dashboard/support/${id}/status`, { status }),
 };
 
 // Students (Admin\StudentController @ /api/admin/students)
@@ -168,6 +171,20 @@ export const videosAPI = {
     api.post('/admin/videos', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0, // no timeout for large video uploads
+      onUploadProgress,
+    }),
+  /** One part of a chunked upload (local / aws). */
+  uploadChunk: (formData, onUploadProgress) =>
+    api.post('/admin/videos/chunk', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress,
+    }),
+  /** Merge chunks and create lesson (local / aws). */
+  completeChunkUpload: (formData, onUploadProgress) =>
+    api.post('/admin/videos/chunk/complete', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
       onUploadProgress,
     }),
   update: (lessonId, data) => {

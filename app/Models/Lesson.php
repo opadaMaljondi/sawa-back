@@ -66,6 +66,12 @@ class Lesson extends Model
                     : null);
         }
 
+        if ($this->video_provider === 'aws') {
+            return $this->video_reference
+                ? Storage::disk('s3')->url($this->video_reference)
+                : null;
+        }
+
         if ($this->video_provider === 'youtube') {
             return YouTubeService::playbackUrl($this->video_reference);
         }
@@ -79,7 +85,7 @@ class Lesson extends Model
             return null;
         }
 
-        if ($this->video_provider === 'local') {
+        if ($this->video_provider === 'local' || $this->video_provider === 'aws') {
             return $this->video_playback_url; // Direct file URL works for video tag
         }
 

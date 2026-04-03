@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Globe, Mail, Shield, Save, Loader2, Sun, Moon, Monitor, Gift } from 'lucide-react';
+import { Settings, Globe, Mail, Shield, Save, Loader2, Sun, Moon, Monitor, Gift, MessageCircle } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -21,6 +21,12 @@ const ALLOWED_SETTING_KEYS = [
     'referral_first_subscription_discount_percent',
     'referral_first_subscription_discount_fixed',
     'referral_enrollment_bonus',
+    'support_phone',
+    'support_email',
+    'support_whatsapp',
+    'support_telegram',
+    'privacy_policy',
+    'terms_and_conditions',
 ];
 
 const REFERRAL_DEFAULTS = {
@@ -28,6 +34,15 @@ const REFERRAL_DEFAULTS = {
     referral_first_subscription_discount_percent: '0',
     referral_first_subscription_discount_fixed: '0',
     referral_enrollment_bonus: '0',
+};
+
+const SUPPORT_LEGAL_DEFAULTS = {
+    support_phone: '',
+    support_email: '',
+    support_whatsapp: '',
+    support_telegram: '',
+    privacy_policy: '',
+    terms_and_conditions: '',
 };
 
 const SettingsPage = () => {
@@ -50,12 +65,11 @@ const SettingsPage = () => {
             const res = await settingsAPI.getAll();
             setSettings(res);
 
-            // Map settings to formData
-            const data = {};
-            res.forEach(item => {
+            const data = { ...SUPPORT_LEGAL_DEFAULTS, ...REFERRAL_DEFAULTS };
+            res.forEach((item) => {
                 data[item.key] = item.value;
             });
-            setFormData({ ...REFERRAL_DEFAULTS, ...data });
+            setFormData(data);
         } catch (e) {
             console.error(e);
             setMessage({ type: 'error', text: 'فشل تحميل الإعدادات' });
@@ -74,10 +88,10 @@ const SettingsPage = () => {
             setSaving(true);
             setMessage({ type: '', text: '' });
 
-            // Only send known keys (avoids stray keys; matches server whitelist)
-            const settingsToUpdate = ALLOWED_SETTING_KEYS.filter((key) =>
-                Object.prototype.hasOwnProperty.call(formData, key)
-            ).map((key) => ({ key, value: formData[key] }));
+            const settingsToUpdate = ALLOWED_SETTING_KEYS.map((key) => ({
+                key,
+                value: formData[key] ?? '',
+            }));
 
             await settingsAPI.update({ settings: settingsToUpdate });
             setMessage({ type: 'success', text: 'تم حفظ الإعدادات بنجاح' });
@@ -94,6 +108,7 @@ const SettingsPage = () => {
     const tabs = [
         { id: 'general', icon: <Globe size={18} />, label: t('settings.general') },
         { id: 'contact', icon: <Mail size={18} />, label: t('settings.contact') },
+        { id: 'support', icon: <MessageCircle size={18} />, label: t('settings.supportTab') },
         { id: 'system', icon: <Shield size={18} />, label: t('settings.system') },
         { id: 'referral', icon: <Gift size={18} />, label: t('settings.referral') },
     ];
@@ -143,6 +158,64 @@ const SettingsPage = () => {
                             <Input
                                 value={formData.address || ''}
                                 onChange={(e) => handleChange('address', e.target.value)}
+                            />
+                        </div>
+                    </div>
+                );
+            case 'support':
+                return (
+                    <div className="settings-form-grid">
+                        <p className="settings-hint">{t('settings.supportHint')}</p>
+                        <div className="form-item">
+                            <label>{t('settings.supportPhoneApp')}</label>
+                            <Input
+                                value={formData.support_phone || ''}
+                                onChange={(e) => handleChange('support_phone', e.target.value)}
+                                placeholder="+963..."
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.supportEmailApp')}</label>
+                            <Input
+                                type="email"
+                                value={formData.support_email || ''}
+                                onChange={(e) => handleChange('support_email', e.target.value)}
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.supportWhatsapp')}</label>
+                            <Input
+                                value={formData.support_whatsapp || ''}
+                                onChange={(e) => handleChange('support_whatsapp', e.target.value)}
+                                placeholder="+963..."
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.supportTelegram')}</label>
+                            <Input
+                                value={formData.support_telegram || ''}
+                                onChange={(e) => handleChange('support_telegram', e.target.value)}
+                                placeholder="@channel"
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.privacyPolicy')}</label>
+                            <textarea
+                                className="settings-textarea"
+                                rows={12}
+                                value={formData.privacy_policy || ''}
+                                onChange={(e) => handleChange('privacy_policy', e.target.value)}
+                                placeholder={t('settings.privacyPolicyPlaceholder')}
+                            />
+                        </div>
+                        <div className="form-item">
+                            <label>{t('settings.termsAndConditions')}</label>
+                            <textarea
+                                className="settings-textarea"
+                                rows={12}
+                                value={formData.terms_and_conditions || ''}
+                                onChange={(e) => handleChange('terms_and_conditions', e.target.value)}
+                                placeholder={t('settings.termsPlaceholder')}
                             />
                         </div>
                     </div>

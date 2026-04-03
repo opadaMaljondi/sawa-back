@@ -43,7 +43,8 @@
         "all": "All",
         "select": "Select",
         "preview": "Preview",
-        "none": "None"
+        "none": "None",
+        "refresh": "Refresh"
     },
     "nav": {
         "dashboard": "Dashboard",
@@ -61,7 +62,8 @@
         "finance": "Finance & wallets",
         "financeCenter": "Wallet & earnings",
         "coupons": "Coupon management",
-        "referrals": "Referrals"
+        "referrals": "Referrals",
+        "support": "Support"
     },
     "referrals": {
         "title": "Referral program",
@@ -395,7 +397,36 @@
         "referralProgramEnabled": "Enable referral program",
         "referralFirstSubDiscountPercent": "First subscription discount for invited user (%)",
         "referralFirstSubDiscountFixed": "First subscription discount — fixed (SYP), if percent is 0",
-        "referralEnrollmentBonus": "Referrer wallet bonus after invited user's first subscription (SYP)"
+        "referralEnrollmentBonus": "Referrer wallet bonus after invited user's first subscription (SYP)",
+        "supportTab": "App support & legal",
+        "supportHint": "Shown in the student mobile app (support screen and policies).",
+        "supportPhoneApp": "Support phone (app)",
+        "supportEmailApp": "Support email (app)",
+        "supportWhatsapp": "WhatsApp",
+        "supportTelegram": "Telegram",
+        "privacyPolicy": "Privacy policy",
+        "privacyPolicyPlaceholder": "Full privacy policy text for the app…",
+        "termsAndConditions": "Terms and conditions",
+        "termsPlaceholder": "Full terms text for the app…"
+    },
+    "support": {
+        "title": "Support inbox",
+        "subtitle": "Messages sent from the student app (Support)",
+        "total": "Total",
+        "statusNew": "New",
+        "statusRead": "Read",
+        "statusReplied": "Replied",
+        "filterStatus": "Filter by status",
+        "allStatuses": "All statuses",
+        "inboxTitle": "Messages",
+        "empty": "No messages yet",
+        "colDate": "Date",
+        "colUser": "User",
+        "colSubject": "Subject",
+        "colMessage": "Message",
+        "colStatus": "Status",
+        "prev": "Previous",
+        "next": "Next"
     },
     "dashboard": {
         "welcome": "Welcome to Dashboard",

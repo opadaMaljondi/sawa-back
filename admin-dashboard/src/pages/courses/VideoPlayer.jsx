@@ -79,6 +79,27 @@ const VideoPlayer = () => {
       );
     }
 
+    if (
+      (lesson.video_provider === 'local' || lesson.video_provider === 'aws') &&
+      lesson.video_playback_url
+    ) {
+      return (
+        <div
+          className="w-full bg-black rounded-lg overflow-hidden flex items-center justify-center"
+          style={{ height: '70vh', maxHeight: 'calc(100vh - 180px)' }}
+        >
+          <video
+            src={lesson.video_playback_url}
+            controls
+            className="max-w-full max-h-full"
+            title={lesson.title}
+          >
+            المتصفح لا يدعم تشغيل هذا الفيديو.
+          </video>
+        </div>
+      );
+    }
+
     return (
       <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
         لا يمكن تشغيل هذا الفيديو من لوحة التحكم حالياً. نوع المزود: {lesson.video_provider || 'غير معروف'}
@@ -110,7 +131,7 @@ const VideoPlayer = () => {
               <p>
                 <strong>عنوان الدرس:</strong> {lesson.title}
               </p>
-              {lesson.video_playback_url && (
+              {lesson.video_playback_url && lesson.video_provider === 'youtube' && (
                 <p>
                   <strong>رابط YouTube: </strong>
                   <a href={lesson.video_playback_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
@@ -118,6 +139,15 @@ const VideoPlayer = () => {
                   </a>
                 </p>
               )}
+              {lesson.video_playback_url &&
+                (lesson.video_provider === 'local' || lesson.video_provider === 'aws') && (
+                  <p>
+                    <strong>رابط الملف: </strong>
+                    <a href={lesson.video_playback_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                      فتح الرابط
+                    </a>
+                  </p>
+                )}
               <p>
                 <strong>مزود الفيديو:</strong> {lesson.video_provider || 'غير محدد'}
               </p>

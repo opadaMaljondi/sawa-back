@@ -18,7 +18,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Wallet,
-    Gift
+    Gift,
+    MessageCircle
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -53,6 +54,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
         { path: '/notifications', icon: Bell, label: t('common.notifications') },
         { path: '/coupons', icon: Tag, label: t('nav.coupons') },
         { path: '/referrals', icon: Gift, label: t('nav.referrals') },
+        { path: '/support', icon: MessageCircle, label: t('nav.support') },
         { path: '/settings', icon: Settings, label: t('nav.settings') }
     ];
 

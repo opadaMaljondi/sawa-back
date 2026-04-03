@@ -43,7 +43,8 @@
         "all": "الكل",
         "select": "اختر",
         "preview": "معاينة",
-        "none": "لا يوجد"
+        "none": "لا يوجد",
+        "refresh": "تحديث"
     },
     "nav": {
         "dashboard": "لوحة القيادة",
@@ -61,7 +62,8 @@
         "finance": "المالية والمحافظ",
         "financeCenter": "إدارة المحافظ والأرباح",
         "coupons": "إدارة الكوبونات",
-        "referrals": "الإحالات"
+        "referrals": "الإحالات",
+        "support": "الدعم"
     },
     "referrals": {
         "title": "برنامج الإحالة",
@@ -395,7 +397,36 @@
         "referralProgramEnabled": "تفعيل برنامج الإحالة",
         "referralFirstSubDiscountPercent": "خصم أول اشتراك للمدعو (%)",
         "referralFirstSubDiscountFixed": "خصم أول اشتراك — مبلغ ثابت (ل.س) إذا كانت النسبة 0",
-        "referralEnrollmentBonus": "مكافأة محفظة المحيل بعد أول اشتراك للمدعو (ل.س)"
+        "referralEnrollmentBonus": "مكافأة محفظة المحيل بعد أول اشتراك للمدعو (ل.س)",
+        "supportTab": "دعم التطبيق والسياسات",
+        "supportHint": "يظهر في تطبيق الطالب (شاشة الدعم والسياسات).",
+        "supportPhoneApp": "هاتف الدعم (التطبيق)",
+        "supportEmailApp": "بريد الدعم (التطبيق)",
+        "supportWhatsapp": "واتساب",
+        "supportTelegram": "تيليجرام",
+        "privacyPolicy": "سياسة الخصوصية",
+        "privacyPolicyPlaceholder": "نص سياسة الخصوصية الكامل للتطبيق…",
+        "termsAndConditions": "الشروط والأحكام",
+        "termsPlaceholder": "نص الشروط والأحكام الكامل للتطبيق…"
+    },
+    "support": {
+        "title": "صندوق الدعم",
+        "subtitle": "رسائل الطلاب من تطبيق الجوال (الدعم)",
+        "total": "الإجمالي",
+        "statusNew": "جديد",
+        "statusRead": "مقروء",
+        "statusReplied": "تم الرد",
+        "filterStatus": "تصفية حسب الحالة",
+        "allStatuses": "كل الحالات",
+        "inboxTitle": "الرسائل",
+        "empty": "لا توجد رسائل بعد",
+        "colDate": "التاريخ",
+        "colUser": "المستخدم",
+        "colSubject": "الموضوع",
+        "colMessage": "الرسالة",
+        "colStatus": "الحالة",
+        "prev": "السابق",
+        "next": "التالي"
     },
     "dashboard": {
         "welcome": "مرحباً بك في لوحة التحكم",

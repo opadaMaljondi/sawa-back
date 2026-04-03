@@ -112,8 +112,9 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
     Route::get('wallet/transactions', [WalletController::class, 'transactions']);
     Route::post('wallet/deposit', [WalletController::class, 'deposit']);
 
-    // Video Downloads
+    // Video Downloads (chunk-friendly GET file: local = Range-capable binary; aws = JSON with signed URL)
     Route::get('videos/downloaded', [VideoDownloadController::class, 'downloaded']);
+    Route::get('videos/{lessonId}/file', [VideoDownloadController::class, 'streamLessonFile'])->whereNumber('lessonId');
     Route::post('videos/{lessonId}/download', [VideoDownloadController::class, 'download']);
     Route::get('videos/{token}/stream', [VideoDownloadController::class, 'stream']);
     Route::delete('videos/{token}', [VideoDownloadController::class, 'delete']);
@@ -243,6 +244,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('course-sections/{id}', [AdminCourseSectionController::class, 'destroy']);
 
     // Videos (رفع وتعديل وحذف فيديوهات لأي كورس)
+    Route::post('videos/chunk', [AdminVideoController::class, 'uploadChunk']);
+    Route::post('videos/chunk/complete', [AdminVideoController::class, 'completeChunkUpload']);
     Route::post('videos', [AdminVideoController::class, 'upload']);
     Route::put('videos/{lessonId}', [AdminVideoController::class, 'update']);
     Route::delete('videos/{lessonId}', [AdminVideoController::class, 'destroy']);

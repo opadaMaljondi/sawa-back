@@ -70,15 +70,26 @@ class VideoEncryptionService
     }
 
     /**
-     * Verify download link signature (e.g. token + lesson + user signed).
+     * HMAC for stream URLs (optional when request is already authenticated as download owner).
+     */
+    public function generateDownloadSignature(string $token, int $lessonId, int $studentId): string
+    {
+        $payload = $token.'|'.$lessonId.'|'.$studentId;
+
+        return hash_hmac('sha256', $payload, (string) config('app.key'));
+    }
+
+    /**
+     * Verify download link signature (token + lesson + user signed with APP_KEY).
      */
     public function verifyDownloadSignature(string $token, int $lessonId, int $studentId, ?string $signature): bool
     {
         if ($signature === null || $signature === '') {
             return false;
         }
-        $payload = $token . '|' . $lessonId . '|' . $studentId;
-        $expected = hash_hmac('sha256', $payload, config('app.key'));
+
+        $expected = $this->generateDownloadSignature($token, $lessonId, $studentId);
+
         return hash_equals($expected, $signature);
     }
 }
