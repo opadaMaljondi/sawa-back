@@ -1,4 +1,5 @@
 Options -MultiViews
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^ index.html [QSA,L]
+RewriteRule ^ index.html [QSA,L]http://161.97.126.253/admin/teachers/new
+http://161.97.126.253/teachers/new
