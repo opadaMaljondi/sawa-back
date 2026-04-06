@@ -25,6 +25,8 @@ const CourseForm = () => {
     active: true,
     allow_section_purchase: false,
     allow_lesson_purchase: false,
+    allow_instructor_contact: false,
+    whatsapp_group_link: '',
   });
   const [courseImage, setCourseImage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +65,8 @@ const CourseForm = () => {
           active: res.active,
           allow_section_purchase: !!res.allow_section_purchase,
           allow_lesson_purchase: !!res.allow_lesson_purchase,
+          allow_instructor_contact: !!res.allow_instructor_contact,
+          whatsapp_group_link: res.whatsapp_group_link || '',
         });
         setCourseImage(null);
       } catch (e) {
@@ -101,6 +105,8 @@ const CourseForm = () => {
       fd.append('active', form.active ? '1' : '0');
       fd.append('allow_section_purchase', form.allow_section_purchase ? '1' : '0');
       fd.append('allow_lesson_purchase', form.allow_lesson_purchase ? '1' : '0');
+      fd.append('allow_instructor_contact', form.allow_instructor_contact ? '1' : '0');
+      fd.append('whatsapp_group_link', form.whatsapp_group_link?.trim() || '');
 
       if (courseImage) {
         fd.append('image', courseImage);
@@ -240,6 +246,36 @@ const CourseForm = () => {
               />
               <label htmlFor="allow_lesson_purchase" className="text-sm">السماح بشراء الدروس منفردة</label>
             </div>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2 space-y-3">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('courses.contactSectionTitle')}
+            </p>
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="allow_instructor_contact"
+                checked={form.allow_instructor_contact}
+                onChange={handleChange('allow_instructor_contact')}
+                className="mt-1"
+              />
+              <div>
+                <label htmlFor="allow_instructor_contact" className="text-sm cursor-pointer">
+                  {t('courses.allowInstructorContact')}
+                </label>
+                <p className="text-xs text-gray-500 mt-0.5">{t('courses.allowInstructorContactHint')}</p>
+              </div>
+            </div>
+            <Input
+              label={t('courses.whatsappGroupLink')}
+              type="url"
+              placeholder="https://chat.whatsapp.com/..."
+              value={form.whatsapp_group_link}
+              onChange={handleChange('whatsapp_group_link')}
+              fullWidth
+            />
+            <p className="text-xs text-gray-500 -mt-2">{t('courses.whatsappGroupLinkHint')}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -253,7 +253,8 @@
         "experience": "سنوات الخبرة",
         "assignedCourses": "الكورسات المعينة",
         "totalTeachers": "إجمالي الأساتذة",
-        "activeTeachers": "الأساتذة النشطون"
+        "activeTeachers": "الأساتذة النشطون",
+        "instructorPermissions": "صلاحيات الأستاذ"
     },
     "courses": {
         "title": "إدارة الكورسات",
@@ -288,7 +289,12 @@
         "stateDraft": "مسودة",
         "statePending": "قيد المراجعة",
         "statePublished": "منشور",
-        "listingActive": "الظهور"
+        "listingActive": "الظهور",
+        "contactSectionTitle": "التواصل مع الأستاذ",
+        "allowInstructorContact": "السماح بعرض وسيلة التواصل للطلاب",
+        "allowInstructorContactHint": "عند التفعيل يظهر رقم الأستاذ للطلاب (واتساب / اتصال).",
+        "whatsappGroupLink": "رابط مجموعة واتساب (اختياري)",
+        "whatsappGroupLinkHint": "رابط دعوة القروب؛ يمكن تركه فارغاً."
     },
     "permissions": {
         "title": "إدارة الصلاحيات",
@@ -433,7 +439,10 @@
         "overview": "نظرة عامة",
         "statistics": "الإحصائيات",
         "recentActivities": "الأنشطة الأخيرة",
-        "quickActions": "إجراءات سريعة"
+        "quickActions": "إجراءات سريعة",
+        "recentCourses": "آخر الكورسات المضافة",
+        "addedAt": "تاريخ الإضافة",
+        "noRecentCourses": "لا توجد كورسات بعد."
     },
     "auth": {
         "login": "تسجيل الدخول",

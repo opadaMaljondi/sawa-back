@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -54,6 +55,8 @@ class ExamController extends Controller
             'active' => false,
             'created_by' => auth()->id(),
         ]);
+
+        InstructorAdminNotifier::notify($course, 'تمت إضافة امتحان جديد يحتاج مراجعة');
 
         return response()->json([
             'message' => 'Exam created successfully. Waiting for admin approval.',

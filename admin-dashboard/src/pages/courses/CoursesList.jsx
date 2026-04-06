@@ -216,7 +216,12 @@ const CoursesList = () => {
                                                     >
                                                         <Eye size={16} />
                                                     </button>
-                                                    <button className="action-btn action-btn-edit" title={t('common.edit')}>
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-btn-edit"
+                                                        title={t('common.edit')}
+                                                        onClick={() => navigate(`/courses/${course.id}/edit`)}
+                                                    >
                                                         <Edit size={16} />
                                                     </button>
                                                     <button className="action-btn action-btn-delete" title={t('common.delete')}>

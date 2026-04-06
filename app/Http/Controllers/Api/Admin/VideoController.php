@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,11 +13,10 @@ use Illuminate\Support\Str;
 
 class VideoController extends Controller
 {
-    protected YouTubeService $youtubeService;
-
-    public function __construct(YouTubeService $youtubeService)
-    {
-        $this->youtubeService = $youtubeService;
+    public function __construct(
+        protected YouTubeService $youtubeService,
+        protected LessonVideoProcessingService $lessonVideoProcessing
+    ) {
     }
 
     /**
@@ -68,7 +68,7 @@ class VideoController extends Controller
             $fullTempPath = storage_path('app/' . $tempPath);
 
             try {
-                [$videoProvider, $videoReference, $message] = $this->processUploadedVideoFile(
+                [$videoProvider, $videoReference, $message] = $this->lessonVideoProcessing->processUploadedVideoFile(
                     $fullTempPath,
                     $request,
                     $course,
@@ -221,7 +221,7 @@ class VideoController extends Controller
         $maxBytes = $maxTotalKb * 1024;
         if ($totalBytes > $maxBytes) {
             Storage::disk('local')->delete($tempRelative);
-            $this->deleteChunkDirectory($uploadId);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
             return response()->json([
                 'message' => 'Video exceeds maximum allowed size ('.$maxTotalKb.' KB).',
@@ -230,7 +230,7 @@ class VideoController extends Controller
 
         if ($totalBytes === 0) {
             Storage::disk('local')->delete($tempRelative);
-            $this->deleteChunkDirectory($uploadId);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
             return response()->json(['message' => 'Merged file is empty.'], 422);
         }
@@ -239,7 +239,7 @@ class VideoController extends Controller
         $videoProvider = $request->input('video_provider');
 
         try {
-            [$videoProvider, $videoReference, $message] = $this->processUploadedVideoFile(
+            [$videoProvider, $videoReference, $message] = $this->lessonVideoProcessing->processUploadedVideoFile(
                 $fullTempPath,
                 $request,
                 $course,
@@ -249,7 +249,7 @@ class VideoController extends Controller
             );
         } catch (\RuntimeException $e) {
             Storage::disk('local')->delete($tempRelative);
-            $this->deleteChunkDirectory($uploadId);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
             return response()->json([
                 'message' => $e->getMessage(),
@@ -257,7 +257,7 @@ class VideoController extends Controller
             ], 422);
         }
 
-        $this->deleteChunkDirectory($uploadId);
+        $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
         $thumbnailPath = null;
         if ($request->hasFile('thumbnail')) {
@@ -287,92 +287,6 @@ class VideoController extends Controller
             'video_provider'     => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
-    }
-
-    /**
-     * Process a temp video file (single upload or merged chunks). Deletes temp storage path on success.
-     *
-     * @return array{0: string, 1: string, 2: string}
-     *
-     * @throws \RuntimeException
-     */
-    protected function processUploadedVideoFile(
-        string $fullTempPath,
-        Request $request,
-        Course $course,
-        string $videoProvider,
-        ?string $fileExtension,
-        ?string $tempRelativePath
-    ): array {
-        $ext = $fileExtension;
-        if ($ext === null || $ext === '') {
-            $ext = $request->hasFile('video')
-                ? ($request->file('video')->getClientOriginalExtension() ?: 'mp4')
-                : 'mp4';
-        }
-        $ext = $ext ?: 'mp4';
-
-        $deleteTemp = function () use ($tempRelativePath): void {
-            if ($tempRelativePath) {
-                Storage::disk('local')->delete($tempRelativePath);
-            }
-        };
-
-        if ($videoProvider === 'aws') {
-            $s3Path = "videos/lessons/course_{$course->id}/" . Str::random(40) . ".{$ext}";
-            try {
-                Storage::disk('s3')->put($s3Path, file_get_contents($fullTempPath), ['visibility' => 'public']);
-            } catch (\Throwable $e) {
-                throw new \RuntimeException('Failed to upload video to S3: ' . $e->getMessage());
-            }
-            $deleteTemp();
-
-            return ['aws', $s3Path, 'Video uploaded successfully to AWS S3.'];
-        }
-
-        if ($videoProvider === 'local') {
-            $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . ".{$ext}";
-            Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
-            $deleteTemp();
-
-            return ['local', $localPath, 'Video saved locally.'];
-        }
-
-        $uploadedUrl = $this->youtubeService->uploadVideo($fullTempPath, [
-            'title'          => $request->title,
-            'description'    => $request->description ?? "Course: {$course->title}",
-            'privacy_status' => 'unlisted',
-        ]);
-
-        if ($uploadedUrl) {
-            $deleteTemp();
-
-            return ['youtube', $uploadedUrl, 'Video uploaded successfully to YouTube.'];
-        }
-
-        if ($request->video_provider === 'youtube') {
-            throw new \RuntimeException('Failed to upload video to YouTube: ' . ($this->youtubeService->getLastError() ?? 'Unauthorized/Unknown error'));
-        }
-
-        $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . ".{$ext}";
-        Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
-        $deleteTemp();
-
-        return ['local', $localPath, 'Video saved locally.'];
-    }
-
-    protected function deleteChunkDirectory(string $uploadId): void
-    {
-        $dir = storage_path('app/videos/chunks/'.$uploadId);
-        if (! is_dir($dir)) {
-            return;
-        }
-        foreach (glob($dir.DIRECTORY_SEPARATOR.'*') ?: [] as $file) {
-            if (is_file($file)) {
-                @unlink($file);
-            }
-        }
-        @rmdir($dir);
     }
 
     /**

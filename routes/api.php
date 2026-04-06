@@ -25,16 +25,24 @@ use App\Http\Controllers\Api\Admin\SubscriptionController as AdminSubscriptionCo
 use App\Http\Controllers\Api\Admin\VideoController as AdminVideoController;
 use App\Http\Controllers\Api\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\Admin\YearController as AdminYearController;
+use App\Http\Controllers\Api\AppInfoController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\InstructorAuthController;
 use App\Http\Controllers\Api\Auth\StudentAuthController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\Instructor\CatalogController as InstructorCatalogController;
 use App\Http\Controllers\Api\Instructor\ChatGroupController;
 use App\Http\Controllers\Api\Instructor\CourseController as InstructorCourseController;
+use App\Http\Controllers\Api\Instructor\CourseSectionController as InstructorCourseSectionController;
 use App\Http\Controllers\Api\Instructor\ExamController;
+use App\Http\Controllers\Api\Instructor\HomeController as InstructorHomeController;
 use App\Http\Controllers\Api\Instructor\NoteController;
+use App\Http\Controllers\Api\Instructor\ProfileController as InstructorProfileController;
+use App\Http\Controllers\Api\Instructor\SubjectController as InstructorSubjectController;
+use App\Http\Controllers\Api\Instructor\SupportController as InstructorSupportController;
 use App\Http\Controllers\Api\Instructor\VideoController;
-use App\Http\Controllers\Api\Student\AppController as StudentAppController;
+use App\Http\Controllers\Api\Instructor\WalletController as InstructorWalletController;
+use App\Http\Controllers\Api\UserNotificationsController;
 use App\Http\Controllers\Api\Student\ChatController;
 use App\Http\Controllers\Api\Student\CouponController as StudentCouponController;
 use App\Http\Controllers\Api\Student\CourseController as StudentCourseController;
@@ -63,6 +71,11 @@ use Illuminate\Support\Facades\Route;
 // Public Routes (no token required - for registration screen)
 Route::get('departments', [StudentCourseController::class, 'departments']);
 Route::get('years', fn () => response()->json(Year::where('active', true)->orderBy('order')->get()));
+
+// App legal & settings (students, instructors — no auth)
+Route::get('app/terms', [AppInfoController::class, 'terms']);
+Route::get('app/privacy', [AppInfoController::class, 'privacy']);
+Route::get('app/settings', [AppInfoController::class, 'settings']);
 
 // Public Auth Routes
 Route::prefix('auth')->group(function () {
@@ -144,21 +157,71 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
     Route::get('support/info', [StudentSupportController::class, 'info']);
     Route::post('support', [StudentSupportController::class, 'send']);
 
-    // App Info (Terms, Privacy, Settings)
-    Route::get('app/terms', [StudentAppController::class, 'terms']);
-    Route::get('app/privacy', [StudentAppController::class, 'privacy']);
-    Route::get('app/settings', [StudentAppController::class, 'settings']);
+    // App Info (Terms, Privacy, Settings) — authenticated alias; public copies: GET /api/app/*
+    Route::get('app/terms', [AppInfoController::class, 'terms']);
+    Route::get('app/privacy', [AppInfoController::class, 'privacy']);
+    Route::get('app/settings', [AppInfoController::class, 'settings']);
+
+    // In-app notifications (same table as admin-targeted user notifications)
+    Route::get('notifications', [UserNotificationsController::class, 'index']);
+    Route::get('notifications/unread-count', [UserNotificationsController::class, 'unreadCount']);
+    Route::post('notifications/{id}/read', [UserNotificationsController::class, 'markAsRead']);
 });
 
 // Instructor Routes
 Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(function () {
+    // Home (banners + departments) & catalog browse (same data as student app)
+    Route::get('home', [InstructorHomeController::class, 'index']);
+    Route::get('catalog/departments/{id}', [InstructorCatalogController::class, 'departmentShow']);
+    Route::get('catalog/departments/{departmentId}/courses', [InstructorCatalogController::class, 'coursesByYearAndSemester']);
+    Route::get('catalog/courses/subject/{subjectId}', [InstructorCatalogController::class, 'coursesBySubject']);
+    Route::get('catalog/courses', [InstructorCatalogController::class, 'searchCourses']);
+    Route::get('departments/{departmentId}/subjects', [InstructorSubjectController::class, 'index'])
+        ->whereNumber('departmentId');
+    Route::get('subjects', [InstructorSubjectController::class, 'index']);
+
+    // Profile & permissions
+    Route::get('profile', [InstructorProfileController::class, 'show']);
+    Route::match(['put', 'post'], 'profile', [InstructorProfileController::class, 'update']);
+    Route::get('permissions', [InstructorProfileController::class, 'permissions']);
+
+    // Wallet
+    Route::get('wallet', [InstructorWalletController::class, 'show']);
+    Route::get('wallet/transactions', [InstructorWalletController::class, 'transactions']);
+    Route::get('wallet/withdrawals', [InstructorWalletController::class, 'withdrawals']);
+
+    // Notifications
+    Route::get('notifications', [UserNotificationsController::class, 'index']);
+    Route::get('notifications/unread-count', [UserNotificationsController::class, 'unreadCount']);
+    Route::post('notifications/{id}/read', [UserNotificationsController::class, 'markAsRead']);
+
+    // Support (to administration)
+    Route::post('support', [InstructorSupportController::class, 'send']);
+
+    // App legal (authenticated alias; public: GET /api/app/*)
+    Route::get('app/terms', [AppInfoController::class, 'terms']);
+    Route::get('app/privacy', [AppInfoController::class, 'privacy']);
+    Route::get('app/settings', [AppInfoController::class, 'settings']);
+
     // Courses
     Route::get('courses', [InstructorCourseController::class, 'index']);
+    Route::get('courses/my', [InstructorCourseController::class, 'myCourses']);
+    Route::get('courses/search', [InstructorCourseController::class, 'search']);
     Route::post('courses', [InstructorCourseController::class, 'store']);
     Route::match(['put', 'post'], 'courses/{courseId}', [InstructorCourseController::class, 'update']);
+    Route::post('courses/{courseId}/whatsapp-link', [InstructorCourseController::class, 'updateWhatsappLink']);
     Route::get('courses/{courseId}/stats', [InstructorCourseController::class, 'stats']);
+    Route::get('courses/{courseId}/subscriptions', [InstructorCourseController::class, 'subscriptions']);
+
+    // Course sections (units)
+    Route::get('courses/{courseId}/sections', [InstructorCourseSectionController::class, 'index']);
+    Route::post('courses/{courseId}/sections', [InstructorCourseSectionController::class, 'store']);
+    Route::match(['put', 'post'], 'courses/{courseId}/sections/{sectionId}', [InstructorCourseSectionController::class, 'update']);
+    Route::delete('courses/{courseId}/sections/{sectionId}', [InstructorCourseSectionController::class, 'destroy']);
 
     // Videos
+    Route::post('videos/chunk', [VideoController::class, 'uploadChunk']);
+    Route::post('videos/chunk/complete', [VideoController::class, 'completeChunkUpload']);
     Route::post('videos', [VideoController::class, 'upload']);
     Route::put('videos/{lessonId}', [VideoController::class, 'update']);
     Route::delete('videos/{lessonId}', [VideoController::class, 'destroy']);
@@ -191,6 +254,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('dashboard/top-courses', [DashboardController::class, 'topCourses']);
     Route::get('dashboard/recent-enrollments', [DashboardController::class, 'recentEnrollments']);
     Route::get('dashboard/pending-courses', [DashboardController::class, 'pendingCourses']);
+    Route::get('dashboard/recent-courses', [DashboardController::class, 'recentCourses']);
     Route::get('dashboard/revenue-by-instructor', [DashboardController::class, 'revenueByInstructor']);
     Route::get('dashboard/revenue-by-department', [DashboardController::class, 'revenueByDepartment']);
     Route::get('dashboard/student-growth', [DashboardController::class, 'studentGrowth']);

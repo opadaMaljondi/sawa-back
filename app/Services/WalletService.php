@@ -100,14 +100,18 @@ class WalletService
         ]);
     }
 
-    public function getTransactions(int $userId, int $perPage = 20)
+    public function getTransactions(int $userId, int $perPage = 20, ?string $type = null)
     {
         $wallet = Wallet::where('user_id', $userId)->first();
-        if (!$wallet) {
+        if (! $wallet) {
             return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
         }
-        return Transaction::where('wallet_id', $wallet->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+        $q = Transaction::where('wallet_id', $wallet->id)
+            ->orderBy('created_at', 'desc');
+        if ($type !== null && $type !== '') {
+            $q->where('type', $type);
+        }
+
+        return $q->paginate($perPage);
     }
 }
