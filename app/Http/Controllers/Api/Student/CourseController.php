@@ -30,12 +30,38 @@ class CourseController extends Controller
         $subscriptions = Enrollment::where('student_id', $user->id)
             ->where('active', true)
             ->with([
-                'course:id,title,image,price,students_count',
+                'course' => function ($query) {
+                    $query->select(
+                        'id',
+                        'title',
+                        'image',
+                        'price',
+                        'students_count',
+                        'instructor_id',
+                        'subject_id'
+                    )
+                        ->withCount([
+                            'lessons as total_videos' => fn ($q) => $q->approvedForStudents(),
+                        ])
+                        ->withSum([
+                            'lessons' => fn ($q) => $q->approvedForStudents(),
+                        ], 'duration');
+                },
                 'course.instructor:id,full_name,image',
                 'course.subject:id,name,department_id',
             ])
             ->latest('enrolled_at')
             ->get();
+
+        $subscriptions->each(function ($enrollment) {
+            if (! $enrollment->course) {
+                return;
+            }
+            $c = $enrollment->course;
+            // مدة إجمالية بالدقائق (مجموع duration للدروس المعتمدة)
+            $c->setAttribute('total_duration_minutes', (int) ($c->lessons_sum_duration ?? 0));
+            $c->makeHidden('lessons_sum_duration');
+        });
 
         return response()->json([
             'banners' => $banners,

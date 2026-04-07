@@ -27,7 +27,7 @@ class NoteController extends Controller
         $notes = Note::where('active', true)
             ->whereIn('course_id', $enrolledCourseIds)
             ->with([
-                'course:id,title,image',
+                'course:id,title,image,instructor_id',
                 'course.instructor:id,full_name',
                 'lesson:id,title',
             ])
