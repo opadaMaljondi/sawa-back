@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Note;
 use App\Models\Course;
+use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -51,8 +52,10 @@ class NoteController extends Controller
             'title' => $request->title,
             'file_path' => $filePath,
             'file_size' => $request->file('file')->getSize(),
-            'is_active' => false, // يحتاج موافقة الأدمن
+            'active' => false, // يحتاج موافقة الأدمن
         ]);
+
+        InstructorAdminNotifier::notify($course, 'تمت إضافة مرفق / ملاحظة جديدة تنتظر المراجعة');
 
         return response()->json([
             'message' => 'Note created successfully. Waiting for admin approval.',

@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserCircle, Wallet } from 'lucide-react';
+import { UserCircle, Wallet, Shield, Video, Users, Layout, Pencil, Check } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
-import { teachersAPI } from '../../services/api';
+import { teachersAPI, permissionsAPI } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { formatDateTime } from '../../utils/date';
 import '../students/StudentDetails.css';
+import '../permissions/RolesAndPermissions.css';
 
 const TeacherDetails = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const { id } = useParams();
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,19 +29,47 @@ const TeacherDetails = () => {
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState('');
 
-  const availablePermissions = [
-    { id: 'create-course', label: 'إنشاء كورس' },
-    { id: 'update-course', label: 'تعديل كورس' },
-    { id: 'delete-course', label: 'حذف كورس' },
-    { id: 'upload-video', label: 'رفع فيديو' },
-    { id: 'update-video', label: 'تعديل فيديو' },
-    { id: 'delete-video', label: 'حذف فيديو' },
-    { id: 'manage-notes', label: 'إدارة النوط والملفات' },
-    { id: 'manage-exams', label: 'إدارة الاختبارات' },
-    { id: 'manage-chat-groups', label: 'إدارة مجموعات الشات' },
-  ];
+  const [allPermissions, setAllPermissions] = useState([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
 
   const [permissions, setPermissions] = useState([]);
+
+  /** نفس تجميع صفحة الأدوار: محتوى، مستخدمون، أكاديمي، أخرى */
+  const permissionGroups = useMemo(() => {
+    const groups = {
+      content: { icon: <Video size={18} />, permissions: [] },
+      users: { icon: <Users size={18} />, permissions: [] },
+      academic: { icon: <Shield size={18} />, permissions: [] },
+      other: { icon: <Layout size={18} />, permissions: [] },
+    };
+
+    allPermissions.forEach((perm) => {
+      const n = perm.name || '';
+      if (
+        n.includes('video')
+        || n.includes('note')
+        || n.includes('exam')
+        || n.includes('course')
+        || n.includes('section')
+        || n.includes('chat')
+      ) {
+        groups.content.permissions.push(perm);
+      } else if (n.includes('student') || n.includes('instructor')) {
+        groups.users.permissions.push(perm);
+      } else if (
+        n.includes('department')
+        || n.includes('year')
+        || n.includes('semester')
+        || n.includes('subject')
+      ) {
+        groups.academic.permissions.push(perm);
+      } else {
+        groups.other.permissions.push(perm);
+      }
+    });
+
+    return groups;
+  }, [allPermissions]);
 
   const loadTeacher = async () => {
     try {
@@ -76,9 +106,25 @@ const TeacherDetails = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const togglePermission = (permId) => {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setPermissionsLoading(true);
+        const list = await permissionsAPI.getPermissions();
+        setAllPermissions(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error(e);
+        setAllPermissions([]);
+      } finally {
+        setPermissionsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const togglePermission = (permName) => {
     setPermissions((prev) =>
-      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId],
+      prev.includes(permName) ? prev.filter((p) => p !== permName) : [...prev, permName],
     );
   };
 
@@ -149,10 +195,18 @@ const TeacherDetails = () => {
           <h1 className="page-title">{t('teachers.teacherDetails')}</h1>
           <p className="page-subtitle">{teacher.full_name}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link to="/teachers">
             <Button variant="outline">{t('common.back')}</Button>
           </Link>
+          <Button
+            type="button"
+            variant="primary"
+            icon={<Pencil size={18} />}
+            onClick={() => navigate(`/teachers/${id}/edit`)}
+          >
+            {t('teachers.editTeacher')}
+          </Button>
           <Button variant="outline" onClick={toggleSuspend}>
             {teacher.active ? 'إيقاف الأستاذ' : 'تفعيل الأستاذ'}
           </Button>
@@ -345,23 +399,55 @@ const TeacherDetails = () => {
         </div>
       </Card>
 
-      <Card title="صلاحيات الأستاذ">
-        <div className="p-4 space-y-3 text-sm">
-          <p className="text-gray-600">يمكنك تحديد ما يسمح لهذا الأستاذ بفعله داخل النظام.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {availablePermissions.map((perm) => (
-              <label key={perm.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={permissions.includes(perm.id)}
-                  onChange={() => togglePermission(perm.id)}
-                />
-                <span>{perm.label}</span>
-              </label>
-            ))}
-          </div>
-          <Button variant="primary" onClick={savePermissions} loading={savingPerms}>
-            حفظ الصلاحيات
+      <Card title={t('teachers.instructorPermissions')}>
+        <div className="p-4 space-y-4 text-sm">
+          <p className="text-gray-600">
+            يتم جلب كل الصلاحيات المعرفة في النظام من الخادم. حدد ما يُسمح لهذا الأستاذ بفعله (أسماء الصلاحيات كما في قاعدة البيانات).
+          </p>
+          {permissionsLoading ? (
+            <p className="text-gray-500">{t('common.loading')}</p>
+          ) : !allPermissions.length ? (
+            <p className="text-amber-600">تعذر تحميل قائمة الصلاحيات.</p>
+          ) : (
+            <div className="permissions-selector teacher-permissions-selector">
+              {Object.keys(permissionGroups).map((groupKey) => {
+                const group = permissionGroups[groupKey];
+                if (!group.permissions.length) return null;
+                return (
+                  <div key={groupKey} className="perm-group">
+                    <h4 className="group-title">
+                      {group.icon}
+                      {t(`permissions.groups.${groupKey}`) || groupKey}
+                    </h4>
+                    <div className="perms-list">
+                      {group.permissions.map((perm) => (
+                        <label key={perm.id} className="perm-item">
+                          <div className="checkbox-wrapper">
+                            <input
+                              type="checkbox"
+                              checked={permissions.includes(perm.name)}
+                              onChange={() => togglePermission(perm.name)}
+                            />
+                            <span className="checkmark">
+                              <Check size={12} />
+                            </span>
+                          </div>
+                          <span className="perm-name">{perm.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <Button
+            variant="primary"
+            onClick={savePermissions}
+            loading={savingPerms}
+            disabled={permissionsLoading || !allPermissions.length}
+          >
+            {t('common.save')}
           </Button>
         </div>
       </Card>

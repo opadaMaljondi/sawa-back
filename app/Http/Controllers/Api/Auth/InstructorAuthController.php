@@ -4,12 +4,18 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class InstructorAuthController extends Controller
 {
+    public function __construct(protected WalletService $walletService)
+    {
+    }
+
     /**
      * Login instructor
      */
@@ -38,9 +44,24 @@ class InstructorAuthController extends Controller
 
         $token = $user->createToken('instructor-token')->plainTextToken;
 
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $user->id],
+            ['balance' => 0, 'currency' => 'SYP']
+        );
+
+        // صلاحيات مباشرة على المستخدم فقط (كما يحددها الأدمن) — وليست صلاحيات دور instructor العامة
+        $directPerms = $user->getDirectPermissions()->pluck('name')->values();
+
         return response()->json([
             'user' => $user,
             'token' => $token,
+            'permissions' => $directPerms,
+            'wallet' => [
+                'balance' => $this->walletService->getBalance($user->id),
+                'currency' => $wallet->currency ?? 'SYP',
+                'total_deposited' => (float) ($wallet->total_deposited ?? 0),
+                'total_spent' => (float) ($wallet->total_spent ?? 0),
+            ],
         ]);
     }
 

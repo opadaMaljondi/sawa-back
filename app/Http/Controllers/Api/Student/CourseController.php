@@ -175,6 +175,8 @@ class CourseController extends Controller
             'students_count' => $course->students_count,
             'allow_section_purchase' => $course->allow_section_purchase,
             'allow_lesson_purchase' => $course->allow_lesson_purchase,
+            'allow_instructor_contact' => (bool) ($course->allow_instructor_contact ?? false),
+            'whatsapp_group_link' => $course->whatsapp_group_link,
             'sections_count' => $course->sections->count(),
             'lessons_count' => $course->lessons->count(),
             'total_hours' => round($totalMinutes / 60, 1),
@@ -184,13 +186,14 @@ class CourseController extends Controller
         // ----- Instructor -----
         $instructor = null;
         if ($course->instructor) {
+            $showPhone = (bool) ($course->allow_instructor_contact ?? false);
             $instructor = [
                 'id' => $course->instructor->id,
                 'full_name' => $course->instructor->full_name,
                 'image' => $course->instructor->image,
                 'specialty' => $course->instructor->specialty,
                 'bio' => $course->instructor->bio,
-                'phone' => $course->instructor->phone,
+                'phone' => $showPhone ? $course->instructor->phone : null,
             ];
         }
 

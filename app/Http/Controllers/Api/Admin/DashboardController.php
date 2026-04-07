@@ -222,6 +222,31 @@ class DashboardController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────
+    // 4b. Recently created courses (for dashboard → quick edit)
+    // GET /admin/dashboard/recent-courses?limit=8
+    // ─────────────────────────────────────────────────────────────
+    public function recentCourses(Request $request)
+    {
+        $limit = min(max((int) $request->input('limit', 8), 1), 30);
+
+        $courses = Course::with(['instructor:id,full_name,image', 'subject:id,name'])
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->map(fn ($c) => [
+                'id'         => $c->id,
+                'title'      => $c->title,
+                'status'     => $c->status,
+                'active'     => $c->active,
+                'created_at' => $c->created_at?->toDateTimeString(),
+                'instructor' => $c->instructor?->only(['id', 'full_name', 'image']),
+                'subject'    => $c->subject?->only(['id', 'name']),
+            ]);
+
+        return response()->json(['courses' => $courses]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // 5. Revenue breakdown per instructor (top 10)
     // GET /admin/dashboard/revenue-by-instructor
     // ─────────────────────────────────────────────────────────────

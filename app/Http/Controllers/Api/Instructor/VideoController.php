@@ -5,18 +5,19 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
+use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class VideoController extends Controller
 {
-    protected YouTubeService $youtubeService;
-
-    public function __construct(YouTubeService $youtubeService)
-    {
-        $this->youtubeService = $youtubeService;
+    public function __construct(
+        protected YouTubeService $youtubeService,
+        protected LessonVideoProcessingService $lessonVideoProcessing
+    ) {
     }
 
     /**
@@ -99,6 +100,8 @@ class VideoController extends Controller
             'active' => false,
             'order' => (int) ($request->order ?? 1),
         ]);
+
+        InstructorAdminNotifier::notify($course, 'تم رفع درس فيديو جديد يحتاج مراجعة');
 
         if ($videoProvider === 'youtube') {
             $message = 'Video uploaded successfully. Waiting for admin approval.';
@@ -199,4 +202,163 @@ class VideoController extends Controller
 
         return response()->json(['message' => 'First lesson set as free']);
     }
+
+    /**
+     * Chunk upload (same as admin). Upload chunks then POST complete-chunk.
+     */
+    public function uploadChunk(Request $request)
+    {
+        $maxKb = max(1, (int) config('video.chunk_max_kb', 5120));
+        $request->validate([
+            'upload_id'    => 'required|uuid',
+            'chunk_index'  => 'required|integer|min:0',
+            'total_chunks' => 'required|integer|min:1|max:10000',
+            'chunk'        => ['required', 'file', 'max:'.$maxKb],
+            'original_name'=> 'required|string|max:255',
+        ]);
+
+        $ext = strtolower((string) pathinfo($request->original_name, PATHINFO_EXTENSION));
+        if (! in_array($ext, ['mp4', 'avi', 'mov'], true)) {
+            return response()->json(['message' => 'Invalid video type. Allowed: mp4, avi, mov.'], 422);
+        }
+
+        if ($request->integer('chunk_index') >= $request->integer('total_chunks')) {
+            return response()->json(['message' => 'chunk_index must be less than total_chunks.'], 422);
+        }
+
+        $dir = 'videos/chunks/'.$request->upload_id;
+        $request->file('chunk')->storeAs($dir, (string) $request->chunk_index, 'local');
+
+        return response()->json([
+            'received'    => true,
+            'chunk_index' => $request->integer('chunk_index'),
+        ]);
+    }
+
+    /**
+     * Merge chunks and create lesson (instructor: pending approval).
+     */
+    public function completeChunkUpload(Request $request)
+    {
+        if (! auth()->user()->hasPermissionTo('create video')) {
+            return response()->json(['message' => 'Permission denied'], 403);
+        }
+
+        $maxTotalKb = max(1, (int) config('video.max_video_kb', 512000));
+
+        $request->validate([
+            'upload_id'     => 'required|uuid',
+            'total_chunks'  => 'required|integer|min:1|max:10000',
+            'original_name' => 'required|string|max:255',
+            'video_provider'=> 'required|in:local,aws',
+            'course_id'     => 'required|exists:courses,id',
+            'section_id'    => 'nullable|exists:course_sections,id',
+            'title'         => 'required|string|max:255',
+            'is_free'       => 'boolean',
+            'order'         => 'nullable|integer',
+        ]);
+
+        $course = Course::where('instructor_id', auth()->id())->findOrFail($request->course_id);
+
+        $ext = strtolower((string) pathinfo($request->original_name, PATHINFO_EXTENSION));
+        if (! in_array($ext, ['mp4', 'avi', 'mov'], true)) {
+            return response()->json(['message' => 'Invalid video type. Allowed: mp4, avi, mov.'], 422);
+        }
+
+        $uploadId = $request->upload_id;
+        $total    = $request->integer('total_chunks');
+        $chunkDir = storage_path('app/videos/chunks/'.$uploadId);
+
+        if (! is_dir($chunkDir)) {
+            return response()->json(['message' => 'Upload session not found. Upload chunks first.'], 422);
+        }
+
+        $outName      = Str::random(40).'.'.$ext;
+        $tempRelative = 'videos/temp/'.$outName;
+        $fullTempPath = storage_path('app/'.$tempRelative);
+
+        $outHandle = fopen($fullTempPath, 'wb');
+        if ($outHandle === false) {
+            return response()->json(['message' => 'Could not create merged file.'], 500);
+        }
+
+        $totalBytes = 0;
+        for ($i = 0; $i < $total; $i++) {
+            $part = $chunkDir.DIRECTORY_SEPARATOR.$i;
+            if (! is_file($part)) {
+                fclose($outHandle);
+                @unlink($fullTempPath);
+
+                return response()->json([
+                    'message' => "Missing chunk {$i} of {$total}.",
+                ], 422);
+            }
+            $in = fopen($part, 'rb');
+            if ($in === false) {
+                fclose($outHandle);
+                @unlink($fullTempPath);
+
+                return response()->json(['message' => "Could not read chunk {$i}."], 500);
+            }
+            $totalBytes += stream_copy_to_stream($in, $outHandle);
+            fclose($in);
+        }
+        fclose($outHandle);
+
+        $maxBytes = $maxTotalKb * 1024;
+        if ($totalBytes > $maxBytes) {
+            Storage::disk('local')->delete($tempRelative);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
+
+            return response()->json(['message' => 'Video exceeds maximum allowed size ('.$maxTotalKb.' KB).'], 422);
+        }
+
+        if ($totalBytes === 0) {
+            Storage::disk('local')->delete($tempRelative);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
+
+            return response()->json(['message' => 'Merged file is empty.'], 422);
+        }
+
+        $videoProvider = $request->input('video_provider');
+
+        try {
+            [$videoProvider, $videoReference, $message] = $this->lessonVideoProcessing->processUploadedVideoFile(
+                $fullTempPath,
+                $request,
+                $course,
+                $videoProvider,
+                $ext,
+                $tempRelative
+            );
+        } catch (\RuntimeException $e) {
+            Storage::disk('local')->delete($tempRelative);
+            $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
+
+        $lesson = Lesson::create([
+            'course_id'       => $course->id,
+            'section_id'      => $request->section_id,
+            'title'           => $request->title,
+            'video_provider'  => $videoProvider,
+            'video_reference' => $videoReference,
+            'is_free'         => $request->boolean('is_free', false),
+            'active'          => false,
+            'order'           => (int) ($request->order ?? 1),
+        ]);
+
+        InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة');
+
+        return response()->json([
+            'message'            => $message,
+            'lesson'             => $lesson,
+            'video_provider'     => $videoProvider,
+            'video_playback_url' => $lesson->video_playback_url,
+        ], 201);
+    }
 }
+

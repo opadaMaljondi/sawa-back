@@ -253,7 +253,8 @@
         "experience": "Years of Experience",
         "assignedCourses": "Assigned Courses",
         "totalTeachers": "Total Teachers",
-        "activeTeachers": "Active Teachers"
+        "activeTeachers": "Active Teachers",
+        "instructorPermissions": "Instructor permissions"
     },
     "courses": {
         "title": "Course Management",
@@ -288,7 +289,12 @@
         "stateDraft": "Draft",
         "statePending": "Pending",
         "statePublished": "Published",
-        "listingActive": "Listing"
+        "listingActive": "Listing",
+        "contactSectionTitle": "Contact with instructor",
+        "allowInstructorContact": "Show instructor contact to students",
+        "allowInstructorContactHint": "When enabled, students can see the instructor phone (WhatsApp / call).",
+        "whatsappGroupLink": "WhatsApp group link (optional)",
+        "whatsappGroupLinkHint": "Group invite link; leave empty if none."
     },
     "permissions": {
         "title": "Permission Management",
@@ -433,7 +439,10 @@
         "overview": "Overview",
         "statistics": "Statistics",
         "recentActivities": "Recent Activities",
-        "quickActions": "Quick Actions"
+        "quickActions": "Quick Actions",
+        "recentCourses": "Recently added courses",
+        "addedAt": "Added",
+        "noRecentCourses": "No courses yet."
     },
     "auth": {
         "login": "Login",

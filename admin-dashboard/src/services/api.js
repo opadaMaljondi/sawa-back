@@ -45,6 +45,7 @@ api.interceptors.response.use(
 export const dashboardAPI = {
   stats: () => api.get('/admin/dashboard/stats'),
   topCourses: () => api.get('/admin/dashboard/top-courses'),
+  recentCourses: (params) => api.get('/admin/dashboard/recent-courses', { params }),
   recentEnrollments: () => api.get('/admin/dashboard/recent-enrollments'),
   couponStats: () => api.get('/admin/dashboard/coupon-stats'),
   supportMessages: (params) => api.get('/admin/dashboard/support', { params }),

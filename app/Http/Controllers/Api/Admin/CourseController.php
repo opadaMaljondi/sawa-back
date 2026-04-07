@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\User;
 use App\Services\CourseCommissionService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -68,6 +69,8 @@ class CourseController extends Controller
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
             'free_first_lesson' => 'boolean',
+            'allow_instructor_contact' => 'boolean',
+            'whatsapp_group_link' => 'nullable|string|max:500',
             'status' => 'nullable|in:draft,pending,published',
             'active' => 'boolean',
         ]);
@@ -97,6 +100,8 @@ class CourseController extends Controller
             'allow_section_purchase' => $request->boolean('allow_section_purchase', false),
             'allow_lesson_purchase' => $request->boolean('allow_lesson_purchase', false),
             'free_first_lesson' => $request->boolean('free_first_lesson', false),
+            'allow_instructor_contact' => $request->boolean('allow_instructor_contact', false),
+            'whatsapp_group_link' => $request->input('whatsapp_group_link'),
             'status' => $request->input('status', 'published'),
             'active' => $request->boolean('active', true),
         ]);
@@ -127,6 +132,8 @@ class CourseController extends Controller
             'allow_section_purchase' => 'boolean',
             'allow_lesson_purchase' => 'boolean',
             'free_first_lesson' => 'boolean',
+            'allow_instructor_contact' => 'boolean',
+            'whatsapp_group_link' => 'nullable|string|max:500',
             'status' => 'sometimes|in:draft,pending,published',
             'active' => 'sometimes|boolean',
         ]);
@@ -134,8 +141,13 @@ class CourseController extends Controller
         $data = $request->only([
             'title', 'description', 'price', 'admin_commission',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
+            'whatsapp_group_link',
             'status', 'active',
         ]);
+
+        if ($request->has('allow_instructor_contact')) {
+            $data['allow_instructor_contact'] = $request->boolean('allow_instructor_contact');
+        }
 
         if ($request->hasFile('image')) {
             $oldPath = $course->getRawOriginal('image');
@@ -307,6 +319,15 @@ class CourseController extends Controller
             'status' => 'published',
             'active' => true,
         ]);
+
+        if ($course->instructor_id) {
+            app(NotificationService::class)->sendToUser(
+                (int) $course->instructor_id,
+                'تم قبول كورسك',
+                'تم نشر الكورس: '.$course->title,
+                ['course_id' => (int) $course->id, 'type' => 'course_approved']
+            );
+        }
 
         return response()->json(['message' => 'Course approved successfully']);
     }
