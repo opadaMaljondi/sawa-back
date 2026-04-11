@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
+use App\Support\FullCourseContentNotifier;
 use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -107,6 +108,8 @@ class VideoController extends Controller
             'active'             => true,
             'order'              => (int) ($request->order ?? 1),
         ]);
+
+        FullCourseContentNotifier::lessonPublished($lesson->fresh());
 
         return response()->json([
             'message'           => $message,
@@ -281,6 +284,8 @@ class VideoController extends Controller
             'order'              => (int) ($request->order ?? 1),
         ]);
 
+        FullCourseContentNotifier::lessonPublished($lesson->fresh());
+
         return response()->json([
             'message'            => $message,
             'lesson'             => $lesson,
@@ -295,6 +300,7 @@ class VideoController extends Controller
     public function update(Request $request, $lessonId)
     {
         $lesson = Lesson::findOrFail($lessonId);
+        $wasVisibleToStudents = $lesson->isApprovedForStudents();
 
         $request->validate([
             'title'              => 'sometimes|string|max:255',
@@ -343,9 +349,14 @@ class VideoController extends Controller
             ]);
         }
 
+        $lesson = $lesson->fresh();
+        if (! $wasVisibleToStudents && $lesson->isApprovedForStudents()) {
+            FullCourseContentNotifier::lessonPublished($lesson);
+        }
+
         return response()->json([
             'message' => 'Video updated successfully',
-            'lesson'  => $lesson->fresh(),
+            'lesson'  => $lesson,
         ]);
     }
 
