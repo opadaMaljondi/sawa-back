@@ -119,7 +119,9 @@ class CourseController extends Controller
             ->with([
                 'instructor:id,full_name,image',
                 'sections:id,course_id',
-                'lessons:id,course_id,section_id,duration',
+                'lessons' => fn ($q) => $q
+                    ->select('id', 'course_id', 'section_id', 'duration')
+                    ->approvedForStudents(),
             ])
             ->get()
             ->map(function ($course) {
@@ -187,8 +189,9 @@ class CourseController extends Controller
         $enrolledNoteIds = Enrollment::where('student_id', $student->id)
             ->where('type', 'attachment')->where('active', true)->pluck('note_id')->all();
 
-        // ----- Course summary -----
-        $totalMinutes = $course->lessons->sum('duration');
+        // ----- Course summary (only lessons visible to students: approved + active) -----
+        $approvedLessons = $course->sections->flatMap->lessons;
+        $totalMinutes = $approvedLessons->sum('duration');
 
         $courseData = [
             'id' => $course->id,
@@ -204,7 +207,7 @@ class CourseController extends Controller
             'allow_instructor_contact' => (bool) ($course->allow_instructor_contact ?? false),
             'whatsapp_group_link' => $course->whatsapp_group_link,
             'sections_count' => $course->sections->count(),
-            'lessons_count' => $course->lessons->count(),
+            'lessons_count' => $approvedLessons->count(),
             'total_hours' => round($totalMinutes / 60, 1),
             'subject' => $course->subject,
         ];
@@ -348,10 +351,21 @@ class CourseController extends Controller
 
     /**
      * Search courses.
+     *
+     * Includes section / video counts and duration matching other student list endpoints
+     * (only approved, active lessons count toward videos and total hours).
      */
     public function search(Request $request)
     {
-        $query = Course::approvedForStudents()->with(['instructor', 'subject']);
+        $query = Course::approvedForStudents()
+            ->with(['instructor', 'subject'])
+            ->withCount([
+                'sections',
+                'lessons as lessons_count' => fn ($q) => $q->approvedForStudents(),
+            ])
+            ->withSum([
+                'lessons' => fn ($q) => $q->approvedForStudents(),
+            ], 'duration');
 
         if ($request->has('keyword')) {
             $query->where('title', 'like', '%'.$request->keyword.'%');
@@ -365,6 +379,18 @@ class CourseController extends Controller
             $query->where('subject_id', $request->subject_id);
         }
 
-        return response()->json($query->paginate(20));
+        $paginator = $query->paginate(20);
+
+        $paginator->getCollection()->transform(function (Course $course) {
+            $minutes = (int) ($course->lessons_sum_duration ?? 0);
+            $course->setAttribute('total_duration_minutes', $minutes);
+            $course->setAttribute('total_hours', round($minutes / 60, 1));
+            $course->setAttribute('total_videos', (int) ($course->lessons_count ?? 0));
+            $course->makeHidden('lessons_sum_duration');
+
+            return $course;
+        });
+
+        return response()->json($paginator);
     }
 }
