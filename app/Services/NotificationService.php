@@ -70,6 +70,25 @@ class NotificationService
     }
 
     /**
+     * إشعارات لمشتركي الكورس كاملاً فقط (اشتراك full_course).
+     */
+    public function sendToFullCourseSubscribers(int $courseId, string $title, string $message, array $data = []): array
+    {
+        Course::findOrFail($courseId);
+        $userIds = Enrollment::where('course_id', $courseId)
+            ->where('type', 'full_course')
+            ->where('active', true)
+            ->pluck('student_id')
+            ->unique()
+            ->values()
+            ->all();
+        $data['course_id'] = (string) $courseId;
+        $data['enrollment_scope'] = 'full_course';
+
+        return $this->sendToUserIds($userIds, $title, $message, self::SCOPE_COURSE, $courseId, self::TYPE_COURSE, $data);
+    }
+
+    /**
      * ٤ - إشعارات مخصصة لمستخدم محدد (طالب أو معلم أو أدمن).
      */
     public function sendToUser(int $userId, string $title, string $message, array $data = []): array

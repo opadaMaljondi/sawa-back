@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Support\FullCourseContentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -49,6 +50,8 @@ class ExamController extends Controller
             'created_by' => auth()->id(),
         ]);
 
+        FullCourseContentNotifier::examPublished($exam);
+
         return response()->json([
             'message' => 'Exam created successfully',
             'exam' => $exam,
@@ -61,14 +64,20 @@ class ExamController extends Controller
     public function update(Request $request, $examId)
     {
         $exam = Exam::findOrFail($examId);
+        $wasActive = $exam->active;
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'attachment' => 'nullable|file|mimes:pdf,doc,docx,ppt,pptx,zip|max:10240',
+            'active' => 'sometimes|boolean',
         ]);
 
         $data = $request->only(['title', 'description']);
+
+        if ($request->has('active')) {
+            $data['active'] = $request->boolean('active');
+        }
 
         if ($request->hasFile('attachment')) {
             if ($exam->attachment && ! filter_var($exam->attachment, FILTER_VALIDATE_URL)) {
@@ -78,10 +87,15 @@ class ExamController extends Controller
         }
 
         $exam->update($data);
+        $exam = $exam->fresh();
+
+        if (! $wasActive && $exam->active) {
+            FullCourseContentNotifier::examPublished($exam);
+        }
 
         return response()->json([
             'message' => 'Exam updated successfully',
-            'exam' => $exam->fresh(),
+            'exam' => $exam,
         ]);
     }
 

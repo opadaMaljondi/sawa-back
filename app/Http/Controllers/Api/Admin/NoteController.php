@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Note;
+use App\Support\FullCourseContentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -69,6 +70,8 @@ class NoteController extends Controller
             'uploaded_by' => auth()->id(),
         ]);
 
+        FullCourseContentNotifier::notePublished($note->fresh());
+
         return response()->json([
             'message' => 'Note created successfully',
             'note' => $note,
@@ -81,6 +84,7 @@ class NoteController extends Controller
     public function update(Request $request, $noteId)
     {
         $note = Note::findOrFail($noteId);
+        $wasActive = $note->active;
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
@@ -98,10 +102,15 @@ class NoteController extends Controller
         if ($request->has('active')) $data['active'] = $request->boolean('active');
 
         $note->update($data);
+        $note = $note->fresh();
+
+        if (! $wasActive && $note->active) {
+            FullCourseContentNotifier::notePublished($note);
+        }
 
         return response()->json([
             'message' => 'Note updated successfully',
-            'note' => $note->fresh(),
+            'note' => $note,
         ]);
     }
 

@@ -71,12 +71,21 @@ class StudentAuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'login'    => 'required',
-            'password' => 'required',
+            'login'    => 'nullable|string',
+            'email'    => 'nullable|string',
+            'phone'    => 'nullable|string',
+            'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->login)
-            ->orWhere('phone', $request->login)
+        $loginValue = $this->resolveLoginValue($request);
+        if (! $loginValue) {
+            throw ValidationException::withMessages([
+                'login' => ['Provide one of: login, email, or phone.'],
+            ]);
+        }
+
+        $user = User::where('email', $loginValue)
+            ->orWhere('phone', $loginValue)
             ->first();
 
         if (!$user || !$user->password || !Hash::check($request->password, $user->password)) {
@@ -100,6 +109,14 @@ class StudentAuthController extends Controller
         $token = $user->createToken('student-token')->plainTextToken;
 
         return $this->jsonStudentAuth($user, $token);
+    }
+
+    private function resolveLoginValue(Request $request): ?string
+    {
+        return (string) ($request->input('login')
+            ?? $request->input('email')
+            ?? $request->input('phone')
+            ?? '');
     }
 
     /**

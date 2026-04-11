@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\CourseSection;
+use App\Support\FullCourseContentNotifier;
 use Illuminate\Http\Request;
 
 class CourseSectionController extends Controller
@@ -56,6 +57,8 @@ class CourseSectionController extends Controller
             'order' => $request->order ?? 1,
             'price' => $request->price,
         ]);
+
+        FullCourseContentNotifier::sectionCreated($section);
 
         return response()->json([
             'message' => 'Course section created successfully',

@@ -38,4 +38,23 @@ class UserNotificationsController extends Controller
 
         return response()->json(['message' => 'OK', 'notification' => $n->fresh()]);
     }
+
+    /**
+     * Mark all notifications as read for the authenticated user.
+     */
+    public function markAllAsRead()
+    {
+        $now = now();
+        $updated = UserNotification::where('user_id', auth()->id())
+            ->where('read', false)
+            ->update([
+                'read'    => true,
+                'read_at' => $now,
+            ]);
+
+        return response()->json([
+            'message' => 'All notifications marked as read.',
+            'updated_count' => $updated,
+        ]);
+    }
 }

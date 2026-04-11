@@ -49,6 +49,11 @@ class Lesson extends Model
         return $query->where('approval_status', 'approved')->where('active', true);
     }
 
+    public function isApprovedForStudents(): bool
+    {
+        return $this->approval_status === 'approved' && $this->active;
+    }
+
     /**
      * الرابط الكامل للتشغيل: لليوتيوب الرابط الكامل، للمحلي null.
      */

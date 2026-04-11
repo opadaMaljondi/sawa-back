@@ -74,12 +74,21 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            'login'    => 'required', // email or phone
+            'login'    => 'nullable|string', // email or phone
+            'email'    => 'nullable|string',
+            'phone'    => 'nullable|string',
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $data['login'])
-            ->orWhere('phone', $data['login'])
+        $loginValue = (string) ($data['login'] ?? $data['email'] ?? $data['phone'] ?? '');
+        if ($loginValue === '') {
+            return response()->json([
+                'message' => 'Provide one of: login, email, or phone.',
+            ], 422);
+        }
+
+        $user = User::where('email', $loginValue)
+            ->orWhere('phone', $loginValue)
             ->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
