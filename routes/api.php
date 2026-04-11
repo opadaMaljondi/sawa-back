@@ -165,6 +165,7 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
     // In-app notifications (same table as admin-targeted user notifications)
     Route::get('notifications', [UserNotificationsController::class, 'index']);
     Route::get('notifications/unread-count', [UserNotificationsController::class, 'unreadCount']);
+    Route::post('notifications/read-all', [UserNotificationsController::class, 'markAllAsRead']);
     Route::post('notifications/{id}/read', [UserNotificationsController::class, 'markAsRead']);
 });
 
@@ -193,6 +194,7 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     // Notifications
     Route::get('notifications', [UserNotificationsController::class, 'index']);
     Route::get('notifications/unread-count', [UserNotificationsController::class, 'unreadCount']);
+    Route::post('notifications/read-all', [UserNotificationsController::class, 'markAllAsRead']);
     Route::post('notifications/{id}/read', [UserNotificationsController::class, 'markAsRead']);
 
     // Support (to administration)
