@@ -18,6 +18,10 @@ class CouponService
             return ['valid' => false];
         }
 
+        if ($coupon->user_id !== null && (int) $coupon->user_id !== (int) $userId) {
+            return ['valid' => false];
+        }
+
         $now = Carbon::now();
         if ($now->lt($coupon->valid_from) || $now->gt($coupon->valid_until)) {
             return ['valid' => false];

@@ -23,6 +23,7 @@ class Coupon extends Model
         'valid_from',
         'valid_until',
         'created_by',
+        'user_id',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Coupon extends Model
         'usage_limit' => 'integer',
         'usage_per_user' => 'integer',
         'used_count' => 'integer',
+        'user_id' => 'integer',
         'active' => 'boolean',
         'valid_from' => 'datetime',
         'valid_until' => 'datetime',
@@ -42,6 +44,12 @@ class Coupon extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** When set, only this user may redeem the coupon. */
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function usages(): HasMany
@@ -88,6 +96,10 @@ class Coupon extends Model
 
     public function canBeUsedBy(int $userId): bool
     {
+        if ($this->user_id !== null && (int) $this->user_id !== (int) $userId) {
+            return false;
+        }
+
         if (!$this->isValid()) {
             return false;
         }

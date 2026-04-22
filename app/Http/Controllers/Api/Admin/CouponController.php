@@ -17,7 +17,9 @@ class CouponController extends Controller
     {
         $perPage = min(max((int) $request->get('per_page', 15), 1), 100);
 
-        $query = Coupon::query()->orderByDesc('id');
+        $query = Coupon::query()
+            ->with(['assignedUser:id,full_name,email'])
+            ->orderByDesc('id');
 
         if ($request->filled('search')) {
             $s = $request->get('search');
@@ -46,12 +48,15 @@ class CouponController extends Controller
         if (! isset($validated['usage_per_user'])) {
             $validated['usage_per_user'] = 1;
         }
+        if (! array_key_exists('user_id', $validated)) {
+            $validated['user_id'] = null;
+        }
 
         $coupon = Coupon::create($validated);
 
         return response()->json([
             'message' => 'Coupon created successfully.',
-            'coupon' => $coupon->fresh(),
+            'coupon' => $coupon->fresh()->load(['assignedUser:id,full_name,email']),
         ], 201);
     }
 
@@ -68,11 +73,15 @@ class CouponController extends Controller
             $validated['code'] = strtoupper(trim($validated['code']));
         }
 
+        if (array_key_exists('user_id', $validated) && $validated['user_id'] === '') {
+            $validated['user_id'] = null;
+        }
+
         $coupon->update($validated);
 
         return response()->json([
             'message' => 'Coupon updated successfully.',
-            'coupon' => $coupon->fresh(),
+            'coupon' => $coupon->fresh()->load(['assignedUser:id,full_name,email']),
         ]);
     }
 
@@ -109,6 +118,7 @@ class CouponController extends Controller
                 'min:1',
             ],
             'usage_per_user' => 'required|integer|min:1',
+            'user_id' => 'nullable|integer|exists:users,id',
             'active' => 'boolean',
             'valid_from' => 'required|date',
             'valid_until' => 'required|date|after:valid_from',
@@ -128,6 +138,7 @@ class CouponController extends Controller
             $rules['min_purchase'] = 'sometimes|nullable|numeric|min:0';
             $rules['max_discount'] = 'sometimes|nullable|numeric|min:0';
             $rules['usage_per_user'] = 'sometimes|required|integer|min:1';
+            $rules['user_id'] = 'sometimes|nullable|integer|exists:users,id';
             $rules['active'] = 'sometimes|boolean';
             $rules['valid_from'] = 'sometimes|required|date';
             $rules['valid_until'] = 'sometimes|required|date|after:valid_from';

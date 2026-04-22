@@ -28,6 +28,7 @@ class Course extends Model
         'status',
         'active',
         'students_count',
+        'students_count_display',
         'rating',
         'reviews_count',
     ];
@@ -41,6 +42,7 @@ class Course extends Model
         'allow_instructor_contact' => 'boolean',
         'active' => 'boolean',
         'students_count' => 'integer',
+        'students_count_display' => 'integer',
         'rating' => 'decimal:2',
         'reviews_count' => 'integer',
     ];
@@ -70,6 +72,18 @@ class Course extends Model
     public function instructor()
     {
         return $this->belongsTo(User::class, 'instructor_id');
+    }
+
+    /**
+     * Subscriber count shown in the student app (marketing override when set).
+     */
+    public function subscribersCountForStudents(): int
+    {
+        if ($this->students_count_display !== null) {
+            return (int) $this->students_count_display;
+        }
+
+        return (int) $this->students_count;
     }
 
     /** الكورسات الظاهرة للطالب (موافق عليها من الأدمن). */

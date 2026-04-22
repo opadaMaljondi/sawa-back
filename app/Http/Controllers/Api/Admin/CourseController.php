@@ -136,13 +136,14 @@ class CourseController extends Controller
             'whatsapp_group_link' => 'nullable|string|max:500',
             'status' => 'sometimes|in:draft,pending,published',
             'active' => 'sometimes|boolean',
+            'students_count_display' => 'sometimes|nullable|integer|min:0',
         ]);
 
         $data = $request->only([
             'title', 'description', 'price', 'admin_commission',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
             'whatsapp_group_link',
-            'status', 'active',
+            'status', 'active', 'students_count_display',
         ]);
 
         if ($request->has('allow_instructor_contact')) {
@@ -157,6 +158,10 @@ class CourseController extends Controller
             $data['image'] = $request->file('image')->store('courses', 'public');
         } elseif ($request->has('image') && is_string($request->input('image'))) {
             $data['image'] = $request->input('image');
+        }
+
+        if (array_key_exists('students_count_display', $data) && $data['students_count_display'] === '') {
+            $data['students_count_display'] = null;
         }
 
         $course->update($data);

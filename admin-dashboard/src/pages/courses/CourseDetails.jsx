@@ -100,6 +100,10 @@ const CourseDetails = () => {
     total: 0,
   });
 
+  /** عدد المشتركين المعروض للطلاب (اختياري؛ فارغ = العدد الفعلي) */
+  const [displayCountInput, setDisplayCountInput] = useState('');
+  const [savingDisplayCount, setSavingDisplayCount] = useState(false);
+
   const loadCourse = async () => {
     try {
       setLoading(true);
@@ -124,6 +128,13 @@ const CourseDetails = () => {
     loadCourse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!course) return;
+    setDisplayCountInput(
+      course.students_count_display != null ? String(course.students_count_display) : '',
+    );
+  }, [course]);
 
   useEffect(() => {
     if (!id) return;
@@ -182,6 +193,29 @@ const CourseDetails = () => {
   if (error || !course) {
     return <div className="p-6 text-sm text-red-600">{error || 'لم يتم العثور على الكورس'}</div>;
   }
+
+  const savePublicSubscribersCount = async () => {
+    const v = displayCountInput.trim();
+    let students_count_display = null;
+    if (v !== '') {
+      const n = parseInt(v, 10);
+      if (Number.isNaN(n) || n < 0) {
+        alert('أدخل رقماً صحيحاً (0 أو أكثر)');
+        return;
+      }
+      students_count_display = n;
+    }
+    try {
+      setSavingDisplayCount(true);
+      await coursesAPI.update(id, { students_count_display });
+      await loadCourse();
+    } catch (e) {
+      console.error(e);
+      alert(e.response?.data?.message || 'فشل حفظ العدد المعروض');
+    } finally {
+      setSavingDisplayCount(false);
+    }
+  };
 
   const handleCourseAction = async (type) => {
     try {
@@ -698,6 +732,39 @@ const CourseDetails = () => {
               <p className="mb-1"><strong>عدد الدروس:</strong></p>
               <p className="text-gray-700">{totalLessons}</p>
             </div>
+          </div>
+          <div className="px-4 pb-4 border-t border-gray-100 mt-2 pt-4">
+            <p className="text-sm font-semibold text-gray-900 mb-1">عدد المشتركين الظاهر للطلاب</p>
+            <p className="text-xs text-gray-600 mb-3">
+              العدد الفعلي (اشتراكات كورس كامل، يُحدَّث تلقائياً):{' '}
+              <strong className="text-gray-900">{course.students_count ?? 0}</strong>
+            </p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <Input
+                  label="الرقم المعروض في التطبيق للطلاب (اختياري)"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={displayCountInput}
+                  onChange={(e) => setDisplayCountInput(e.target.value)}
+                  placeholder="فارغ = استخدام العدد الفعلي أعلاه"
+                  fullWidth
+                />
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                loading={savingDisplayCount}
+                onClick={savePublicSubscribersCount}
+              >
+                حفظ العدد المعروض
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              إذا تركت الحقل فارغاً، يرى الطلاب نفس العدد الفعلي. إذا أدخلت رقماً، يُعرض هذا الرقم بدلاً منه
+              (للتسويق أو التقريب) دون تغيير الاشتراكات الحقيقية.
+            </p>
           </div>
         </Card>
       </div>
