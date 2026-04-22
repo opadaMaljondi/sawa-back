@@ -41,7 +41,9 @@ class StudentController extends Controller
             $query->where('active', $request->boolean('active'));
         }
 
-        return response()->json($query->latest()->paginate(20));
+        $perPage = min(max((int) $request->get('per_page', 20), 1), 100);
+
+        return response()->json($query->latest()->paginate($perPage));
     }
 
     /**

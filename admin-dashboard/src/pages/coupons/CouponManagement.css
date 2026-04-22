@@ -6,6 +6,16 @@
   line-height: 1.4;
 }
 
+.coupon-field-hint--muted {
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.coupon-student-select {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
 .coupon-page .page-header {
   display: flex;
   flex-wrap: wrap;

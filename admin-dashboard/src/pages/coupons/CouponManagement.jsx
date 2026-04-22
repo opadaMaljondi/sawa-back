@@ -5,7 +5,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
-import { couponsAPI, dashboardAPI } from '../../services/api';
+import { couponsAPI, dashboardAPI, studentsAPI } from '../../services/api';
 import './CouponManagement.css';
 
 function toDatetimeLocal(input) {
@@ -85,6 +85,11 @@ const CouponManagement = () => {
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
 
+  const [studentOptions, setStudentOptions] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearchInput, setStudentSearchInput] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+
   const fetchStats = useCallback(async () => {
     try {
       const res = await dashboardAPI.couponStats();
@@ -134,15 +139,59 @@ const CouponManagement = () => {
     fetchCoupons(1);
   }, [fetchCoupons, search, activeFilter]);
 
+  useEffect(() => {
+    const id = setTimeout(() => setStudentSearch(studentSearchInput), 400);
+    return () => clearTimeout(id);
+  }, [studentSearchInput]);
+
+  const loadStudentsForCoupon = useCallback(async () => {
+    try {
+      setStudentsLoading(true);
+      const params = { per_page: 80, page: 1 };
+      if (studentSearch.trim()) params.search = studentSearch.trim();
+      const res = await studentsAPI.getAll(params);
+      let list = Array.isArray(res?.data) ? res.data : [];
+      if (
+        editing?.user_id &&
+        editing?.assigned_user &&
+        !list.some((s) => s.id === editing.user_id)
+      ) {
+        list = [
+          {
+            id: editing.user_id,
+            full_name: editing.assigned_user.full_name,
+            email: editing.assigned_user.email,
+          },
+          ...list,
+        ];
+      }
+      setStudentOptions(list);
+    } catch (e) {
+      console.error(e);
+      setStudentOptions([]);
+    } finally {
+      setStudentsLoading(false);
+    }
+  }, [studentSearch, editing]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    loadStudentsForCoupon();
+  }, [modalOpen, loadStudentsForCoupon]);
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
+    setStudentSearchInput('');
+    setStudentSearch('');
     setModalOpen(true);
   };
 
   const openEdit = (row) => {
     setEditing(row);
     setForm(couponToForm(row));
+    setStudentSearchInput('');
+    setStudentSearch('');
     setModalOpen(true);
   };
 
@@ -427,13 +476,29 @@ const CouponManagement = () => {
             <div className="coupon-form-full">
               <label className="input-label">{t('coupon.restrictToUser')}</label>
               <Input
-                type="number"
-                min="1"
-                step="1"
-                value={form.user_id}
-                onChange={(e) => setForm((f) => ({ ...f, user_id: e.target.value }))}
-                placeholder={t('coupon.restrictToUserPlaceholder')}
+                value={studentSearchInput}
+                onChange={(e) => setStudentSearchInput(e.target.value)}
+                placeholder={t('coupon.studentSearchPlaceholder')}
+                disabled={studentsLoading}
               />
+              <select
+                className="input-field coupon-student-select"
+                value={form.user_id === '' || form.user_id == null ? '' : String(form.user_id)}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, user_id: e.target.value === '' ? '' : e.target.value }))
+                }
+                disabled={studentsLoading}
+              >
+                <option value="">{t('coupon.noAssignedStudent')}</option>
+                {studentOptions.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    {(s.full_name || '—') + (s.email ? ` — ${s.email}` : '')}
+                  </option>
+                ))}
+              </select>
+              {studentsLoading && (
+                <p className="coupon-field-hint coupon-field-hint--muted">{t('coupon.studentsLoading')}</p>
+              )}
               <p className="coupon-field-hint">{t('coupon.restrictToUserHint')}</p>
             </div>
             <div className="coupon-form-full">
