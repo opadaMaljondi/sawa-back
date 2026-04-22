@@ -27,8 +27,19 @@ class CourseController extends Controller
     {
         $courses = Course::where('instructor_id', auth()->id())
             ->with(['subject.department', 'subject.year', 'subject.semester', 'sections.lessons'])
+            ->withCount([
+                'sections',
+                'lessonsThroughSections as lessons_count',
+            ])
+            ->withSum('lessonsThroughSections', 'duration')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        $courses->each(function (Course $course) {
+            $minutes = (int) ($course->lessons_through_sections_sum_duration ?? 0);
+            $course->setAttribute('total_hours', round($minutes / 60, 1));
+            $course->makeHidden('lessons_through_sections_sum_duration');
+        });
 
         return response()->json($courses);
     }

@@ -19,9 +19,18 @@ class CourseSectionController extends Controller
     {
         $this->authorizeCourse($courseId);
 
-        $sections = CourseSection::where('course_id', $courseId)
-            ->withCount('lessons')
-            ->orderBy('order')
+        $query = CourseSection::where('course_id', $courseId)->orderBy('order');
+
+        if ($request->boolean('without_lessons')) {
+            $sections = $query->withCount('lessons')->get();
+
+            return response()->json(['sections' => $sections]);
+        }
+
+        $sections = $query
+            ->with([
+                'lessons' => fn ($q) => $q->orderBy('order')->orderBy('id'),
+            ])
             ->get();
 
         return response()->json(['sections' => $sections]);
