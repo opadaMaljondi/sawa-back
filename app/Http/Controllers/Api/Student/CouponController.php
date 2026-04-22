@@ -17,6 +17,10 @@ class CouponController extends Controller
         $userId  = $request->user()->id;
 
         $coupons = Coupon::valid()
+            ->where(function ($q) use ($userId) {
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', $userId);
+            })
             ->get()
             ->map(function ($coupon) use ($userId) {
                 $userUsageCount = $coupon->usages()->where('user_id', $userId)->count();
@@ -37,6 +41,7 @@ class CouponController extends Controller
                     'valid_until'     => $coupon->valid_until?->toDateString(),
                     'usage_limit'     => $coupon->usage_limit,
                     'used_count'      => $coupon->used_count,
+                    'personal'        => $coupon->user_id !== null,
                 ];
             });
 
@@ -59,7 +64,12 @@ class CouponController extends Controller
             return response()->json(['valid' => false, 'message' => 'Coupon not found or expired.'], 422);
         }
 
-        if (!$coupon->canBeUsedBy($request->user()->id)) {
+        $uid = $request->user()->id;
+        if ($coupon->user_id !== null && (int) $coupon->user_id !== (int) $uid) {
+            return response()->json(['valid' => false, 'message' => 'Coupon not found or expired.'], 422);
+        }
+
+        if (!$coupon->canBeUsedBy($uid)) {
             return response()->json(['valid' => false, 'message' => 'You have reached the usage limit for this coupon.'], 422);
         }
 

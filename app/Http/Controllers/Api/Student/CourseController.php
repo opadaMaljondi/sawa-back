@@ -37,6 +37,7 @@ class CourseController extends Controller
                         'image',
                         'price',
                         'students_count',
+                        'students_count_display',
                         'instructor_id',
                         'subject_id'
                     )
@@ -58,6 +59,8 @@ class CourseController extends Controller
                 return;
             }
             $c = $enrollment->course;
+            $c->setAttribute('students_count', $c->subscribersCountForStudents());
+            $c->makeHidden('students_count_display');
             // مدة إجمالية بالدقائق (مجموع duration للدروس المعتمدة)
             $c->setAttribute('total_duration_minutes', (int) ($c->lessons_sum_duration ?? 0));
             $c->makeHidden('lessons_sum_duration');
@@ -138,7 +141,7 @@ class CourseController extends Controller
                     'sections_count' => $course->sections->count(),
                     'lessons_count' => $course->lessons->count(),
                     'total_hours' => round($totalMinutes / 60, 1),
-                    'subscribers_count' => $course->students_count,
+                    'subscribers_count' => $course->subscribersCountForStudents(),
                 ];
             });
 
@@ -201,7 +204,7 @@ class CourseController extends Controller
             'price' => $course->price,
             'rating' => $course->rating,
             'reviews_count' => $course->reviews_count,
-            'students_count' => $course->students_count,
+            'students_count' => $course->subscribersCountForStudents(),
             'allow_section_purchase' => $course->allow_section_purchase,
             'allow_lesson_purchase' => $course->allow_lesson_purchase,
             'allow_instructor_contact' => (bool) ($course->allow_instructor_contact ?? false),
@@ -346,6 +349,11 @@ class CourseController extends Controller
             ])
             ->get();
 
+        $courses->each(function (Course $c) {
+            $c->setAttribute('students_count', $c->subscribersCountForStudents());
+            $c->makeHidden('students_count_display');
+        });
+
         return response()->json(['subject' => $subject, 'courses' => $courses]);
     }
 
@@ -383,6 +391,8 @@ class CourseController extends Controller
 
         $paginator->getCollection()->transform(function (Course $course) {
             $minutes = (int) ($course->lessons_sum_duration ?? 0);
+            $course->setAttribute('students_count', $course->subscribersCountForStudents());
+            $course->makeHidden('students_count_display');
             $course->setAttribute('total_duration_minutes', $minutes);
             $course->setAttribute('total_hours', round($minutes / 60, 1));
             $course->setAttribute('total_videos', (int) ($course->lessons_count ?? 0));

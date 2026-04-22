@@ -28,6 +28,7 @@ function emptyForm() {
     max_discount: '',
     usage_limit: '',
     usage_per_user: '1',
+    user_id: '',
     active: true,
     valid_from: toDatetimeLocal(start),
     valid_until: toDatetimeLocal(end),
@@ -44,6 +45,7 @@ function couponToForm(c) {
     max_discount: c.max_discount != null ? String(c.max_discount) : '',
     usage_limit: c.usage_limit != null ? String(c.usage_limit) : '',
     usage_per_user: String(c.usage_per_user ?? 1),
+    user_id: c.user_id != null ? String(c.user_id) : '',
     active: Boolean(c.active),
     valid_from: toDatetimeLocal(c.valid_from),
     valid_until: toDatetimeLocal(c.valid_until),
@@ -60,6 +62,7 @@ function buildPayload(form) {
     max_discount: form.max_discount === '' ? null : Number(form.max_discount),
     usage_limit: form.usage_limit === '' ? null : parseInt(form.usage_limit, 10),
     usage_per_user: parseInt(form.usage_per_user, 10) || 1,
+    user_id: form.user_id === '' || form.user_id == null ? null : parseInt(form.user_id, 10),
     active: Boolean(form.active),
     valid_from: new Date(form.valid_from).toISOString(),
     valid_until: new Date(form.valid_until).toISOString(),
@@ -272,6 +275,7 @@ const CouponManagement = () => {
                 <thead>
                   <tr>
                     <th>{t('coupon.code')}</th>
+                    <th>{t('coupon.assignedUser')}</th>
                     <th>{t('coupon.type')}</th>
                     <th>{t('coupon.value')}</th>
                     <th>{t('coupon.usedCount')}</th>
@@ -284,7 +288,7 @@ const CouponManagement = () => {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center text-gray-500 py-8">
+                      <td colSpan={9} className="text-center text-gray-500 py-8">
                         —
                       </td>
                     </tr>
@@ -292,6 +296,15 @@ const CouponManagement = () => {
                     rows.map((row) => (
                       <tr key={row.id}>
                         <td className="font-mono font-semibold">{row.code}</td>
+                        <td className="max-w-[200px]">
+                          {row.assigned_user ? (
+                            <span className="text-gray-800" title={row.assigned_user.email || ''}>
+                              {row.assigned_user.full_name || row.assigned_user.email || `#${row.user_id}`}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">{t('coupon.allUsers')}</span>
+                          )}
+                        </td>
                         <td>
                           {row.type === 'percentage'
                             ? t('coupon.typePercentage')
@@ -410,6 +423,18 @@ const CouponManagement = () => {
                 onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
                 required
               />
+            </div>
+            <div className="coupon-form-full">
+              <label className="input-label">{t('coupon.restrictToUser')}</label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={form.user_id}
+                onChange={(e) => setForm((f) => ({ ...f, user_id: e.target.value }))}
+                placeholder={t('coupon.restrictToUserPlaceholder')}
+              />
+              <p className="coupon-field-hint">{t('coupon.restrictToUserHint')}</p>
             </div>
             <div className="coupon-form-full">
               <label className="input-label">{t('coupon.description')}</label>
