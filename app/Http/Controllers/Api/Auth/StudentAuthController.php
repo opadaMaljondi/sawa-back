@@ -170,9 +170,7 @@ class StudentAuthController extends Controller
             return response()->json(['message' => 'This account is not a student account.'], 403);
         }
 
-        if (!$user->active) {
-            return response()->json(['message' => 'Your account has been suspended.'], 403);
-        }
+       
 
         $token = $user->createToken('student-token')->plainTextToken;
 
