@@ -42,10 +42,10 @@ class CourseController extends Controller
                         'subject_id'
                     )
                         ->withCount([
-                            'lessons as total_videos' => fn ($q) => $q->approvedForStudents(),
+                            'lessonsThroughSections as total_videos' => fn ($q) => $q->approvedForStudents(),
                         ])
                         ->withSum([
-                            'lessons' => fn ($q) => $q->approvedForStudents(),
+                            'lessonsThroughSections' => fn ($q) => $q->approvedForStudents(),
                         ], 'duration');
                 },
                 'course.instructor:id,full_name,image',
@@ -61,9 +61,12 @@ class CourseController extends Controller
             $c = $enrollment->course;
             $c->setAttribute('students_count', $c->subscribersCountForStudents());
             $c->makeHidden('students_count_display');
-            // مدة إجمالية بالدقائق (مجموع duration للدروس المعتمدة)
-            $c->setAttribute('total_duration_minutes', (int) ($c->lessons_sum_duration ?? 0));
-            $c->makeHidden('lessons_sum_duration');
+            // مدة إجمالية بالدقائق (مجموع duration للدروس المعتمدة عبر الوحدات)
+            $durationSum = (int) ($c->lessons_through_sections_sum_duration ?? 0);
+            $c->setAttribute('total_duration_minutes', $durationSum);
+            $c->setAttribute('total_hours', round($durationSum / 60, 1));
+            $c->setAttribute('lessons_count', (int) ($c->total_videos ?? 0));
+            $c->makeHidden(['lessons_through_sections_sum_duration', 'lessons_sum_duration']);
         });
 
         return response()->json([
@@ -121,14 +124,17 @@ class CourseController extends Controller
             ->whereIn('subject_id', $subjectIds)
             ->with([
                 'instructor:id,full_name,image',
-                'sections:id,course_id',
-                'lessons' => fn ($q) => $q
-                    ->select('id', 'course_id', 'section_id', 'duration')
-                    ->approvedForStudents(),
             ])
+            ->withCount([
+                'sections',
+                'lessonsThroughSections as lessons_count' => fn ($q) => $q->approvedForStudents(),
+            ])
+            ->withSum([
+                'lessonsThroughSections' => fn ($q) => $q->approvedForStudents(),
+            ], 'duration')
             ->get()
             ->map(function ($course) {
-                $totalMinutes = $course->lessons->sum('duration');
+                $totalMinutes = (int) ($course->lessons_through_sections_sum_duration ?? 0);
 
                 return [
                     'id' => $course->id,
@@ -138,8 +144,8 @@ class CourseController extends Controller
                         ? $course->instructor->only(['id', 'full_name', 'image'])
                         : null,
                     'price' => $course->price,
-                    'sections_count' => $course->sections->count(),
-                    'lessons_count' => $course->lessons->count(),
+                    'sections_count' => (int) ($course->sections_count ?? 0),
+                    'lessons_count' => (int) ($course->lessons_count ?? 0),
                     'total_hours' => round($totalMinutes / 60, 1),
                     'subscribers_count' => $course->subscribersCountForStudents(),
                 ];
@@ -369,10 +375,10 @@ class CourseController extends Controller
             ->with(['instructor', 'subject'])
             ->withCount([
                 'sections',
-                'lessons as lessons_count' => fn ($q) => $q->approvedForStudents(),
+                'lessonsThroughSections as lessons_count' => fn ($q) => $q->approvedForStudents(),
             ])
             ->withSum([
-                'lessons' => fn ($q) => $q->approvedForStudents(),
+                'lessonsThroughSections' => fn ($q) => $q->approvedForStudents(),
             ], 'duration');
 
         if ($request->has('keyword')) {
@@ -390,13 +396,13 @@ class CourseController extends Controller
         $paginator = $query->paginate(20);
 
         $paginator->getCollection()->transform(function (Course $course) {
-            $minutes = (int) ($course->lessons_sum_duration ?? 0);
+            $minutes = (int) ($course->lessons_through_sections_sum_duration ?? 0);
             $course->setAttribute('students_count', $course->subscribersCountForStudents());
             $course->makeHidden('students_count_display');
             $course->setAttribute('total_duration_minutes', $minutes);
             $course->setAttribute('total_hours', round($minutes / 60, 1));
             $course->setAttribute('total_videos', (int) ($course->lessons_count ?? 0));
-            $course->makeHidden('lessons_sum_duration');
+            $course->makeHidden(['lessons_through_sections_sum_duration', 'lessons_sum_duration']);
 
             return $course;
         });

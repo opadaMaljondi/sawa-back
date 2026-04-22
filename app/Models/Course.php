@@ -102,6 +102,21 @@ class Course extends Model
         return $this->hasMany(Lesson::class);
     }
 
+    /**
+     * Lessons reached via course sections (matches student UI; course_id on lessons may be null).
+     */
+    public function lessonsThroughSections()
+    {
+        return $this->hasManyThrough(
+            Lesson::class,
+            CourseSection::class,
+            'course_id',
+            'section_id',
+            'id',
+            'id'
+        );
+    }
+
     public function enrollments()
     {
         return $this->hasMany(Enrollment::class);
