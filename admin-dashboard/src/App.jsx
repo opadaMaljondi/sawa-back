@@ -70,7 +70,7 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/admin" >
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
