@@ -509,7 +509,10 @@
         "appNamePlaceholder": "App Name",
         "messagePlaceholder": "Notification text will appear here for users...",
         "viewAll": "View all notifications",
-        "noNotifications": "No notifications"
+        "noNotifications": "No notifications",
+        "browserAlertsBanner": "To receive admin alerts on your desktop, allow notifications when the browser prompts you.",
+        "browserAlertsDenied": "Browser notifications are blocked. Enable them in this site's settings (lock icon in the address bar).",
+        "enableBrowserAlerts": "Request browser notification permission"
     },
     "banners": {
         "title": "Banner Management",

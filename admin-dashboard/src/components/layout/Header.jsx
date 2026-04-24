@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { notificationsAPI } from '../../services/api';
 import { isFirebaseClientConfigured, subscribeAdminAlerts } from '../../services/firebaseClient';
+import {
+    getBrowserNotificationPermission,
+    requestBrowserNotificationPermission as requestDesktopNotificationPermission,
+} from '../../utils/browserNotifications';
 import './Header.css';
 
 const Header = ({ onMenuClick }) => {
@@ -37,8 +41,12 @@ const Header = ({ onMenuClick }) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [browserNotifPermission, setBrowserNotifPermission] = useState(getBrowserNotificationPermission);
     const notificationRef = useRef(null);
     const profileRef = useRef(null);
+
+    const isAdminDesktopAlerts =
+        user?.type === 'admin' && isFirebaseClientConfigured() && browserNotifPermission !== 'unsupported';
 
     useEffect(() => {
         fetchUnreadCount();
@@ -132,6 +140,25 @@ const Header = ({ onMenuClick }) => {
         }
     };
 
+    const requestBrowserNotificationPermission = async () => {
+        const result = await requestDesktopNotificationPermission();
+        setBrowserNotifPermission(result);
+    };
+
+    const handleNotificationsBellClick = async () => {
+        const willOpen = !showNotifications;
+        if (
+            willOpen &&
+            user?.type === 'admin' &&
+            isFirebaseClientConfigured() &&
+            typeof Notification !== 'undefined' &&
+            Notification.permission === 'default'
+        ) {
+            await requestBrowserNotificationPermission();
+        }
+        setShowNotifications(!showNotifications);
+    };
+
     const handleMarkAsRead = async (e, id) => {
         e.stopPropagation();
         e.preventDefault();
@@ -203,7 +230,7 @@ const Header = ({ onMenuClick }) => {
                     <button
                         className={`header-icon-btn header-notifications ${showNotifications ? 'active' : ''}`}
                         title={t('common.notifications')}
-                        onClick={() => setShowNotifications(!showNotifications)}
+                        onClick={handleNotificationsBellClick}
                     >
                         <Bell size={20} />
                         {unreadCount > 0 && (

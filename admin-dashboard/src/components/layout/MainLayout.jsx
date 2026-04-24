@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import BrowserAlertsBanner from './BrowserAlertsBanner';
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -17,6 +18,7 @@ const MainLayout = () => {
             <div className={`main-layout-content ${sidebarCollapsed ? 'content-expanded' : ''}`}>
                 <Header onMenuClick={toggleSidebar} />
                 <main className="main-content">
+                    <BrowserAlertsBanner />
                     <Outlet />
                 </main>
             </div>

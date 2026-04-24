@@ -509,7 +509,10 @@
         "appNamePlaceholder": "اسم التطبيق",
         "messagePlaceholder": "نص الإشعار سيظهر هنا للمستخدمين...",
         "viewAll": "عرض كل الإشعارات",
-        "noNotifications": "لا توجد إشعارات"
+        "noNotifications": "لا توجد إشعارات",
+        "browserAlertsBanner": "لتصلك تنبيهات الإدارة على سطح المكتب، اسمح بالإشعارات عند ظهور طلب المتصفح.",
+        "browserAlertsDenied": "تم حظر إشعارات المتصفح. يمكنك تفعيلها من إعدادات الموقع (أيقونة القفل بجانب العنوان).",
+        "enableBrowserAlerts": "طلب إذن إشعارات المتصفح"
     },
     "banners": {
         "title": "إدارة البانرات",

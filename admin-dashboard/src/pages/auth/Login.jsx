@@ -5,6 +5,8 @@ import { Lock, Mail } from 'lucide-react';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { useAuth } from '../../contexts/AuthContext';
+import { isFirebaseClientConfigured } from '../../services/firebaseClient';
+import { requestBrowserNotificationPermission } from '../../utils/browserNotifications';
 import './Login.css';
 
 const Login = () => {
@@ -30,6 +32,14 @@ const Login = () => {
     if (!res.success) {
       setError(res.error || 'بيانات الدخول غير صحيحة');
       return;
+    }
+    // طلب إذن إشعارات المتصفح ضمن نفس إيماءة المستخدم (زر الدخول)، عند تفعيل تنبيهات Firebase
+    if (
+      isFirebaseClientConfigured() &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'default'
+    ) {
+      await requestBrowserNotificationPermission();
     }
     navigate('/', { replace: true });
   };
