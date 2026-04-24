@@ -45,13 +45,17 @@ class NoteController extends Controller
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($request->course_id);
 
-        $filePath = $request->file('file')->store('notes', 'public');
+        $file = $request->file('file');
+        $filePath = $file->store('notes', 'public');
 
         $note = Note::create([
             'course_id' => $course->id,
             'title' => $request->title,
             'file_path' => $filePath,
-            'file_size' => $request->file('file')->getSize(),
+            'file_name' => $file->getClientOriginalName(),
+            'file_type' => strtolower($file->getClientOriginalExtension() ?: 'pdf'),
+            'file_size' => $file->getSize(),
+            'uploaded_by' => auth()->id(),
             'active' => false, // يحتاج موافقة الأدمن
         ]);
 
