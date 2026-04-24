@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
+use App\Services\InstructorEnrollmentWalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -82,9 +83,16 @@ class SubscriptionController extends Controller
      */
     public function toggleStatus($id)
     {
-        $enrollment         = Enrollment::findOrFail($id);
-        $enrollment->active = !$enrollment->active;
+        $enrollment = Enrollment::with('course')->findOrFail($id);
+        $wasActive = (bool) $enrollment->active;
+        $enrollment->active = ! $wasActive;
         $enrollment->save();
+
+        app(InstructorEnrollmentWalletService::class)->onEnrollmentActiveChanged(
+            $enrollment,
+            $wasActive,
+            (bool) $enrollment->active
+        );
 
         return response()->json([
             'message' => $enrollment->active ? 'Enrollment activated.' : 'Enrollment suspended.',
@@ -106,7 +114,7 @@ class SubscriptionController extends Controller
             'note'   => 'nullable|string|max:500',
         ]);
 
-        $enrollment = Enrollment::with('student')->findOrFail($id);
+        $enrollment = Enrollment::with(['student', 'course'])->findOrFail($id);
 
         if (!$enrollment->active) {
             return response()->json(['message' => 'Enrollment is already inactive/cancelled.'], 422);
@@ -121,6 +129,11 @@ class SubscriptionController extends Controller
         }
 
         DB::transaction(function () use ($enrollment, $refundAmount, $request) {
+            app(InstructorEnrollmentWalletService::class)->clawbackInstructorShareForRefund(
+                $enrollment,
+                $refundAmount
+            );
+
             // Deactivate enrollment
             $enrollment->update(['active' => false]);
 

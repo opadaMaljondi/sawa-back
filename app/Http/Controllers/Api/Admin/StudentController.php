@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\CourseCommissionService;
+use App\Services\InstructorEnrollmentWalletService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -224,6 +225,8 @@ class StudentController extends Controller
         if ($request->type === 'full_course') {
             $course->increment('students_count');
         }
+
+        app(InstructorEnrollmentWalletService::class)->creditInstructorForEnrollment($enrollment);
 
         return response()->json([
             'message' => 'Student enrolled successfully.',

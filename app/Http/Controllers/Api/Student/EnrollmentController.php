@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\Note;
 use App\Services\CouponService;
 use App\Services\CourseCommissionService;
+use App\Services\InstructorEnrollmentWalletService;
 use App\Services\ReferralService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -172,6 +173,8 @@ class EnrollmentController extends Controller
 
             // Grant referral bonus on purchase
             $this->referralService->grantBonusOnPurchase($enrollment->id);
+
+            app(InstructorEnrollmentWalletService::class)->creditInstructorForEnrollment($enrollment);
 
             // Increment course students count for full-course enrollment
             if ($request->type === 'full_course') {
