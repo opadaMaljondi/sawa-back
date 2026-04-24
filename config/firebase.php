@@ -31,6 +31,11 @@ return [
     'realtime_chat_enabled' => env('FIREBASE_REALTIME_CHAT_ENABLED', true),
 
     /*
+    | Push instructor→admin review events to Realtime Database (sawa/admin_alerts/...)
+    */
+    'realtime_admin_alerts_enabled' => env('FIREBASE_REALTIME_ADMIN_ALERTS_ENABLED', true),
+
+    /*
     | Enable FCM push notifications for new messages
     */
     'fcm_enabled' => env('FIREBASE_FCM_ENABLED', true),

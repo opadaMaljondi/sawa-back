@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
-use App\Models\User;
-use App\Services\NotificationService;
+use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -142,17 +141,12 @@ class CourseController extends Controller
             'active' => false,
         ]);
 
-        // إرسال إشعار للآدمن
-        $notificationService = app(NotificationService::class);
-        $adminIds = User::where('type', 'admin')->pluck('id')->toArray();
-        foreach ($adminIds as $adminId) {
-            $notificationService->sendToUser(
-                $adminId,
-                'كورس جديد ينتظر الموافقة',
-                "قام الأستاذ {$instructor->full_name} بإنشاء كورس جديد بعنوان: {$course->title}",
-                ['course_id' => $course->id, 'type' => 'course_approval']
-            );
-        }
+        InstructorAdminNotifier::notify(
+            $course,
+            "قام الأستاذ {$instructor->full_name} بإنشاء كورس جديد بعنوان: {$course->title}",
+            'كورس جديد ينتظر الموافقة',
+            ['type' => 'course_approval']
+        );
 
         return response()->json([
             'message' => 'Course created successfully. Waiting for admin approval.',
@@ -210,6 +204,13 @@ class CourseController extends Controller
 
         $course->update($data);
 
+        InstructorAdminNotifier::notify(
+            $course->fresh(),
+            'تم تعديل معلومات الكورس (يُنصح بمراجعة التغييرات).',
+            null,
+            ['type' => 'instructor_course_updated']
+        );
+
         return response()->json([
             'message' => 'Course updated successfully',
             'course' => $course->fresh(),
@@ -234,6 +235,13 @@ class CourseController extends Controller
         $course->update([
             'whatsapp_group_link' => $request->input('whatsapp_group_link'),
         ]);
+
+        InstructorAdminNotifier::notify(
+            $course->fresh(),
+            'تم تحديث رابط مجموعة الواتساب للكورس.',
+            null,
+            ['type' => 'instructor_course_updated']
+        );
 
         return response()->json([
             'message' => 'Updated',

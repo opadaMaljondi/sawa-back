@@ -34,7 +34,7 @@ const NotificationsPage = () => {
 
     useEffect(() => {
         if (activeTab === 'inbox') {
-            fetchInbox();
+            fetchInbox(page);
         }
     }, [activeTab, page]);
 
@@ -61,13 +61,17 @@ const NotificationsPage = () => {
         }
     }, [scope, activeTab]);
 
-    const fetchInbox = async () => {
+    const fetchInbox = async (requestedPage = page) => {
         setLoadingInbox(true);
         try {
-            const res = await notificationsAPI.getNotifications(page);
-            const data = res.data?.data || [];
-            setNotifications(Array.isArray(data) ? data : []);
-            setHasMore(res.data?.next_page_url !== null);
+            const res = await notificationsAPI.getNotifications(requestedPage);
+            const list = Array.isArray(res?.data) ? res.data : [];
+            if (requestedPage === 1) {
+                setNotifications(list);
+            } else {
+                setNotifications((prev) => [...prev, ...list]);
+            }
+            setHasMore(res?.next_page_url != null);
         } catch (error) {
             console.error('Error fetching inbox:', error);
             setNotifications([]);
@@ -136,7 +140,7 @@ const NotificationsPage = () => {
                 <div className="tab-switcher">
                     <button
                         className={`tab-btn ${activeTab === 'inbox' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('inbox')}
+                        onClick={() => { setPage(1); setActiveTab('inbox'); }}
                     >
                         <Inbox size={18} />
                         <span>{t('notifications.inbox')}</span>
@@ -156,7 +160,12 @@ const NotificationsPage = () => {
                 <div className="inbox-section animate-fade-in">
                     <div className="inbox-controls">
                         <h3>{t('notifications.received')}</h3>
-                        <Button variant="outline" size="sm" icon={<Bell size={14} />} onClick={fetchInbox}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            icon={<Bell size={14} />}
+                            onClick={() => { setPage(1); fetchInbox(1); }}
+                        >
                             {t('notifications.refresh')}
                         </Button>
                     </div>

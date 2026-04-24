@@ -94,6 +94,16 @@ class ExamController extends Controller
 
         $exam->update($data);
 
+        $exam->loadMissing('course');
+        if ($exam->course) {
+            InstructorAdminNotifier::notify(
+                $exam->course,
+                'تم تعديل امتحان «'.$exam->title.'» (مرفق أو وصف).',
+                null,
+                ['type' => 'instructor_exam_updated', 'exam_id' => $exam->id]
+            );
+        }
+
         return response()->json([
             'message' => 'Exam updated successfully',
             'exam' => $exam->fresh(),

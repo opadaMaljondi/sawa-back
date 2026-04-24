@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\CourseSection;
 use App\Support\FullCourseContentNotifier;
+use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 
 class CourseSectionController extends Controller
@@ -61,6 +62,13 @@ class CourseSectionController extends Controller
 
         FullCourseContentNotifier::sectionCreated($section);
 
+        InstructorAdminNotifier::notify(
+            $course,
+            'تمت إضافة وحدة / قسم جديد «'.$section->title.'».',
+            null,
+            ['type' => 'instructor_section_created', 'section_id' => $section->id]
+        );
+
         return response()->json([
             'message' => 'Section created',
             'section' => $section,
@@ -85,6 +93,14 @@ class CourseSectionController extends Controller
         ]);
 
         $section->update($request->only(['title', 'description', 'order', 'price']));
+
+        $course = Course::where('instructor_id', auth()->id())->findOrFail($courseId);
+        InstructorAdminNotifier::notify(
+            $course,
+            'تم تعديل وحدة «'.$section->fresh()->title.'».',
+            null,
+            ['type' => 'instructor_section_updated', 'section_id' => $section->id]
+        );
 
         return response()->json([
             'message' => 'Section updated',

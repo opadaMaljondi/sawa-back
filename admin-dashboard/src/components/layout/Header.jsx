@@ -21,13 +21,15 @@ import {
     QrCode
 } from 'lucide-react';
 import { notificationsAPI } from '../../services/api';
+import { isFirebaseClientConfigured, subscribeAdminAlerts } from '../../services/firebaseClient';
 import './Header.css';
 
 const Header = ({ onMenuClick }) => {
     const { t } = useTranslation();
+    const location = useLocation();
     const { language, toggleLanguage } = useLanguage();
     const { theme, toggleTheme } = useTheme();
-    const { user, logout } = useAuth();
+    const { user, logout, isAuthenticated } = useAuth();
     const [showProfileMenu, setShowProfileMenu] = useState(false);
 
     // Notifications State
@@ -43,6 +45,50 @@ const Header = ({ onMenuClick }) => {
         const interval = setInterval(fetchUnreadCount, 60000); // Poll every minute
         return () => clearInterval(interval);
     }, []);
+
+    /** استقبال فوري من Firebase Realtime (نفس مسار الخادم: sawa/admin_alerts) */
+    useEffect(() => {
+        if (!isAuthenticated || user?.type !== 'admin' || !isFirebaseClientConfigured()) {
+            return undefined;
+        }
+        let cancelled = false;
+        let unsubscribe = () => {};
+
+        (async () => {
+            try {
+                const off = await subscribeAdminAlerts((payload) => {
+                    fetchUnreadCount();
+                    fetchRecentNotifications();
+                    if (
+                        typeof Notification !== 'undefined' &&
+                        Notification.permission === 'granted' &&
+                        (payload.title || payload.body)
+                    ) {
+                        try {
+                            new Notification(payload.title || 'Sawa', {
+                                body: payload.body || '',
+                                tag: 'sawa-admin-alert',
+                            });
+                        } catch {
+                            /* ignore */
+                        }
+                    }
+                });
+                if (!cancelled) {
+                    unsubscribe = off;
+                } else {
+                    off();
+                }
+            } catch (e) {
+                console.warn('[firebase] subscribeAdminAlerts', e);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            unsubscribe();
+        };
+    }, [isAuthenticated, user?.type]);
 
     useEffect(() => {
         if (showNotifications) {
@@ -77,7 +123,8 @@ const Header = ({ onMenuClick }) => {
         setLoading(true);
         try {
             const res = await notificationsAPI.getNotifications(1);
-            setNotifications(res.data?.data?.slice(0, 5) || []);
+            const list = Array.isArray(res?.data) ? res.data : [];
+            setNotifications(list.slice(0, 5));
         } catch (error) {
             console.error('Error fetching recent notifications:', error);
         } finally {

@@ -144,6 +144,16 @@ class VideoController extends Controller
 
         $lesson->update($request->only(['title', 'is_free', 'order']));
 
+        $lesson->loadMissing('course');
+        if ($lesson->course) {
+            InstructorAdminNotifier::notify(
+                $lesson->course,
+                'تم تعديل معلومات درس فيديو «'.$lesson->title.'».',
+                null,
+                ['type' => 'instructor_lesson_updated', 'lesson_id' => $lesson->id]
+            );
+        }
+
         // تحديث معلومات YouTube إن لزم
         if ($request->has('title') && $lesson->video_provider === 'youtube') {
             $this->youtubeService->updateVideo($lesson->video_reference, [

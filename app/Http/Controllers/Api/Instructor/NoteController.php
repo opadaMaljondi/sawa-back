@@ -83,6 +83,16 @@ class NoteController extends Controller
 
         $note->update($request->only(['title']));
 
+        $note->loadMissing('course');
+        if ($note->course) {
+            InstructorAdminNotifier::notify(
+                $note->course,
+                'تم تعديل عنوان أو بيانات مرفق «'.$note->title.'».',
+                null,
+                ['type' => 'instructor_note_updated', 'note_id' => $note->id]
+            );
+        }
+
         return response()->json([
             'message' => 'Note updated successfully',
             'note' => $note,

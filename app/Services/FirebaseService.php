@@ -114,6 +114,41 @@ class FirebaseService
     }
 
     /**
+     * Broadcast a pending-review event for admin clients listening on Realtime Database.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function pushAdminPendingReview(string $title, string $body, array $data = []): void
+    {
+        if (! config('firebase.realtime_admin_alerts_enabled', true)) {
+            return;
+        }
+        try {
+            $db = $this->getDatabase();
+            if (! $db) {
+                return;
+            }
+            $prefix = config('firebase.realtime_prefix', 'sawa');
+            $path = sprintf('%s/admin_alerts', $prefix);
+            $payload = [
+                'title' => $title,
+                'body' => $body,
+                'sent_at' => now()->toIso8601String(),
+            ];
+            foreach ($data as $k => $v) {
+                if ($v === null) {
+                    continue;
+                }
+                $key = (string) $k;
+                $payload[$key] = is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE);
+            }
+            $db->getReference($path)->push($payload);
+        } catch (\Throwable $e) {
+            Log::warning('Firebase admin alert push failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Send FCM notification to user's devices (by FCM tokens).
      *
      * @param int[] $userIds User IDs to notify (will collect FCM tokens from devices table)

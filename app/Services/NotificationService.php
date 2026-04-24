@@ -141,7 +141,10 @@ class NotificationService
                     $userIds,
                     $title,
                     $message,
-                    array_merge($data, ['type' => 'app_notification', 'scope' => $scope])
+                    array_merge($data, [
+                        'scope' => $scope,
+                        'channel' => 'app',
+                    ])
                 );
                 $fcmSent = true;
             } catch (\Throwable $e) {
