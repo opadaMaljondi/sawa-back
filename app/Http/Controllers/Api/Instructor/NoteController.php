@@ -8,6 +8,7 @@ use App\Models\Course;
 use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class NoteController extends Controller
 {
@@ -39,7 +40,12 @@ class NoteController extends Controller
         $request->validate([
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
-            'file' => 'required|file|mimes:pdf,doc,docx|max:10240', // 10MB max
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'is_free' => 'nullable|boolean',
+            'prevent_download' => 'nullable|boolean',
+            'file_name' => 'nullable|string|max:255',
+            'file' => 'required|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx|max:20480',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())
@@ -48,13 +54,25 @@ class NoteController extends Controller
         $file = $request->file('file');
         $filePath = $file->store('notes', 'public');
 
+        $clientOriginal = $file->getClientOriginalName();
+        $customName = trim((string) $request->input('file_name', ''));
+        $storedFileName = $customName !== ''
+            ? Str::limit(basename($customName), 255, '')
+            : $clientOriginal;
+
+        $isFree = $request->boolean('is_free');
+
         $note = Note::create([
             'course_id' => $course->id,
             'title' => $request->title,
+            'description' => $request->input('description'),
             'file_path' => $filePath,
-            'file_name' => $file->getClientOriginalName(),
+            'file_name' => $storedFileName,
             'file_type' => strtolower($file->getClientOriginalExtension() ?: 'pdf'),
             'file_size' => $file->getSize(),
+            'price' => $isFree ? 0 : (float) $request->input('price', 0),
+            'is_free' => $isFree,
+            'prevent_download' => $request->boolean('prevent_download'),
             'uploaded_by' => auth()->id(),
             'active' => false, // يحتاج موافقة الأدمن
         ]);
@@ -83,9 +101,28 @@ class NoteController extends Controller
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'is_free' => 'nullable|boolean',
+            'prevent_download' => 'nullable|boolean',
+            'file_name' => 'nullable|string|max:255',
         ]);
 
-        $note->update($request->only(['title']));
+        $data = $request->only(['title', 'description', 'price']);
+        if ($request->has('is_free')) {
+            $data['is_free'] = $request->boolean('is_free');
+            if ($data['is_free']) {
+                $data['price'] = 0;
+            }
+        }
+        if ($request->has('prevent_download')) {
+            $data['prevent_download'] = $request->boolean('prevent_download');
+        }
+        if ($request->filled('file_name')) {
+            $data['file_name'] = Str::limit(basename(trim($request->input('file_name'))), 255, '');
+        }
+
+        $note->update($data);
 
         $note->loadMissing('course');
         if ($note->course) {
