@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\Instructor\CatalogController as InstructorCatalogController;
 use App\Http\Controllers\Api\Instructor\ChatGroupController;
 use App\Http\Controllers\Api\Instructor\CourseController as InstructorCourseController;
+use App\Http\Controllers\Api\Instructor\EarningsController as InstructorEarningsController;
 use App\Http\Controllers\Api\Instructor\CourseSectionController as InstructorCourseSectionController;
 use App\Http\Controllers\Api\Instructor\ExamController;
 use App\Http\Controllers\Api\Instructor\HomeController as InstructorHomeController;
@@ -190,6 +191,9 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     Route::get('wallet', [InstructorWalletController::class, 'show']);
     Route::get('wallet/transactions', [InstructorWalletController::class, 'transactions']);
     Route::get('wallet/withdrawals', [InstructorWalletController::class, 'withdrawals']);
+
+    // Earnings (حصة المعلّم من الاشتراكات — إجمالي + لكل كورس)
+    Route::get('earnings', [InstructorEarningsController::class, 'index']);
 
     // Notifications
     Route::get('notifications', [UserNotificationsController::class, 'index']);
