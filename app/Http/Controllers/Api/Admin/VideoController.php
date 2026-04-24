@@ -334,8 +334,9 @@ class VideoController extends Controller
         }
 
         if ($request->hasFile('thumbnail')) {
-            if ($lesson->thumbnail) {
-                Storage::disk('public')->delete($lesson->thumbnail);
+            $oldThumb = $lesson->getRawOriginal('thumbnail');
+            if ($oldThumb && ! filter_var($oldThumb, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($oldThumb);
             }
             $data['thumbnail'] = $request->file('thumbnail')->store('thumbnails/lessons', 'public');
         }

@@ -101,16 +101,20 @@ class Lesson extends Model
         return null;
     }
 
-    public function getThumbnailAttribute($value): ?string
-    {
-        if (!$value) return null;
-        if (filter_var($value, FILTER_VALIDATE_URL)) return $value;
-        return Storage::disk('public')->url($value);
-    }
-
+    /**
+     * رابط كامل للصورة المصغرة (لا يُعدّل عمود thumbnail في القاعدة).
+     */
     public function getThumbnailUrlAttribute(): ?string
     {
-        return $this->thumbnail;
+        $value = $this->attributes['thumbnail'] ?? null;
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        return Storage::disk('public')->url($value);
     }
 
     public function course()

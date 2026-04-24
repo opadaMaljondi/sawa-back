@@ -255,7 +255,7 @@ class VideoDownloadController extends Controller
                     'lesson'        => $lesson ? [
                         'id'        => $lesson->id,
                         'title'     => $lesson->title,
-                        'thumbnail' => $lesson->thumbnail,
+                        'thumbnail' => $lesson->thumbnail_url,
                         'price'     => $lesson->price,
                         'duration'  => $lesson->duration,
                     ] : null,

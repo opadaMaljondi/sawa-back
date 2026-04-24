@@ -253,7 +253,7 @@ class CourseController extends Controller
                     'id' => $lesson->id,
                     'title' => $lesson->title,
                     'description' => $lesson->description,
-                    'thumbnail' => $lesson->thumbnail,
+                    'thumbnail' => $lesson->thumbnail_url,
                     'duration' => $lesson->duration,
                     'order' => $lesson->order,
                     'price' => $lesson->price,

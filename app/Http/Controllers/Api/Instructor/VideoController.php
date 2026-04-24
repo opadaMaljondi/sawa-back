@@ -11,6 +11,7 @@ use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class VideoController extends Controller
 {
@@ -32,16 +33,28 @@ class VideoController extends Controller
 
         $request->validate([
             'course_id' => 'required|exists:courses,id',
-            'section_id' => 'nullable|exists:course_sections,id',
             'title' => 'required|string|max:255',
-            'video' => 'required|file|mimes:mp4,avi,mov|max:10240', // 10GB max
+            'video' => 'required|file|mimes:mp4,avi,mov|max:10240', // KB — راجع config للملفات الكبيرة
             'is_free' => 'boolean',
+            'can_download' => 'boolean',
             'order' => 'nullable|integer',
             'video_provider' => 'nullable|in:youtube,local,aws',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())
             ->findOrFail($request->course_id);
+
+        $request->validate([
+            'section_id' => [
+                'required',
+                Rule::exists('course_sections', 'id')->where(fn ($q) => $q->where('course_id', $course->id)),
+            ],
+            'description' => 'nullable|string',
+            'duration' => 'required|integer|min:1|max:864000',
+            'price' => 'nullable|numeric|min:0',
+            'can_purchase_alone' => 'boolean',
+            'thumbnail' => 'nullable|image|max:2048',
+        ]);
 
         $videoProvider = $request->input('video_provider', 'youtube');
 
@@ -73,7 +86,9 @@ class VideoController extends Controller
         } else {
             $videoId = $this->youtubeService->uploadVideo($fullTempPath, [
                 'title' => $request->title,
-                'description' => "Course: {$course->title}",
+                'description' => $request->filled('description')
+                    ? (string) $request->description
+                    : "Course: {$course->title}",
                 'privacy_status' => 'unlisted',
             ]);
 
@@ -90,13 +105,23 @@ class VideoController extends Controller
             }
         }
 
+        $thumbnailPath = $this->storeLessonThumbnail($request, $course);
+
+        $isFree = $request->boolean('is_free', false);
+
         $lesson = Lesson::create([
             'course_id' => $course->id,
             'section_id' => $request->section_id,
             'title' => $request->title,
+            'description' => $request->input('description'),
+            'duration' => (int) $request->duration,
+            'thumbnail' => $thumbnailPath,
+            'price' => $isFree ? 0 : ($request->filled('price') ? (float) $request->input('price') : null),
             'video_provider' => $videoProvider,
             'video_reference' => $videoReference,
-            'is_free' => $request->boolean('is_free', false),
+            'is_free' => $isFree,
+            'can_download' => $request->boolean('can_download', true),
+            'can_purchase_alone' => $request->boolean('can_purchase_alone', false),
             'active' => false,
             'order' => (int) ($request->order ?? 1),
         ]);
@@ -116,7 +141,7 @@ class VideoController extends Controller
 
         return response()->json([
             'message' => $message,
-            'lesson' => $lesson,
+            'lesson' => $lesson->fresh(),
             'video_provider' => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
@@ -138,11 +163,43 @@ class VideoController extends Controller
 
         $request->validate([
             'title' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'duration' => 'sometimes|integer|min:1|max:864000',
+            'section_id' => [
+                'sometimes',
+                Rule::exists('course_sections', 'id')->where(fn ($q) => $q->where('course_id', $lesson->course_id)),
+            ],
             'is_free' => 'boolean',
+            'can_download' => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'price' => 'nullable|numeric|min:0',
             'order' => 'nullable|integer',
+            'thumbnail' => 'nullable|image|max:2048',
         ]);
 
-        $lesson->update($request->only(['title', 'is_free', 'order']));
+        $data = $request->only(['title', 'description', 'duration', 'section_id', 'order', 'price']);
+        if ($request->has('is_free')) {
+            $data['is_free'] = $request->boolean('is_free');
+            if ($data['is_free']) {
+                $data['price'] = 0;
+            }
+        }
+        if ($request->has('can_download')) {
+            $data['can_download'] = $request->boolean('can_download');
+        }
+        if ($request->has('can_purchase_alone')) {
+            $data['can_purchase_alone'] = $request->boolean('can_purchase_alone');
+        }
+
+        if ($request->hasFile('thumbnail')) {
+            $this->deleteStoredThumbnailIfRelative($lesson->getRawOriginal('thumbnail'));
+            $data['thumbnail'] = $request->file('thumbnail')->store(
+                'thumbnails/lessons/course_'.$lesson->course_id,
+                'public'
+            );
+        }
+
+        $lesson->update($data);
 
         $lesson->loadMissing('course');
         if ($lesson->course) {
@@ -155,15 +212,16 @@ class VideoController extends Controller
         }
 
         // تحديث معلومات YouTube إن لزم
-        if ($request->has('title') && $lesson->video_provider === 'youtube') {
-            $this->youtubeService->updateVideo($lesson->video_reference, [
-                'title' => $request->title,
-            ]);
+        if ($lesson->video_provider === 'youtube' && ($request->filled('title') || $request->filled('description'))) {
+            $this->youtubeService->updateVideo($lesson->video_reference, array_filter([
+                'title' => $request->input('title', $lesson->title),
+                'description' => $request->has('description') ? $request->input('description') : null,
+            ], fn ($v) => $v !== null));
         }
 
         return response()->json([
             'message' => 'Video updated successfully',
-            'lesson' => $lesson,
+            'lesson' => $lesson->fresh(),
         ]);
     }
 
@@ -188,6 +246,8 @@ class VideoController extends Controller
         } elseif ($lesson->video_provider === 'aws' && $lesson->video_reference) {
             Storage::disk('s3')->delete($lesson->video_reference);
         }
+
+        $this->deleteStoredThumbnailIfRelative($lesson->getRawOriginal('thumbnail'));
 
         $lesson->delete();
 
@@ -257,18 +317,30 @@ class VideoController extends Controller
         $maxTotalKb = max(1, (int) config('video.max_video_kb', 512000));
 
         $request->validate([
-            'upload_id'     => 'required|uuid',
-            'total_chunks'  => 'required|integer|min:1|max:10000',
+            'upload_id' => 'required|uuid',
+            'total_chunks' => 'required|integer|min:1|max:10000',
             'original_name' => 'required|string|max:255',
-            'video_provider'=> 'required|in:local,aws',
-            'course_id'     => 'required|exists:courses,id',
-            'section_id'    => 'nullable|exists:course_sections,id',
-            'title'         => 'required|string|max:255',
-            'is_free'       => 'boolean',
-            'order'         => 'nullable|integer',
+            'video_provider' => 'required|in:local,aws',
+            'course_id' => 'required|exists:courses,id',
+            'title' => 'required|string|max:255',
+            'is_free' => 'boolean',
+            'can_download' => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'order' => 'nullable|integer',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())->findOrFail($request->course_id);
+
+        $request->validate([
+            'section_id' => [
+                'required',
+                Rule::exists('course_sections', 'id')->where(fn ($q) => $q->where('course_id', $course->id)),
+            ],
+            'description' => 'nullable|string',
+            'duration' => 'required|integer|min:1|max:864000',
+            'price' => 'nullable|numeric|min:0',
+            'thumbnail' => 'nullable|image|max:2048',
+        ]);
 
         $ext = strtolower((string) pathinfo($request->original_name, PATHINFO_EXTENSION));
         if (! in_array($ext, ['mp4', 'avi', 'mov'], true)) {
@@ -350,25 +422,58 @@ class VideoController extends Controller
 
         $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
+        $thumbnailPath = $this->storeLessonThumbnail($request, $course);
+
+        $isFree = $request->boolean('is_free', false);
+
         $lesson = Lesson::create([
-            'course_id'       => $course->id,
-            'section_id'      => $request->section_id,
-            'title'           => $request->title,
-            'video_provider'  => $videoProvider,
+            'course_id' => $course->id,
+            'section_id' => $request->section_id,
+            'title' => $request->title,
+            'description' => $request->input('description'),
+            'duration' => (int) $request->duration,
+            'thumbnail' => $thumbnailPath,
+            'price' => $isFree ? 0 : ($request->filled('price') ? (float) $request->input('price') : null),
+            'video_provider' => $videoProvider,
             'video_reference' => $videoReference,
-            'is_free'         => $request->boolean('is_free', false),
-            'active'          => false,
-            'order'           => (int) ($request->order ?? 1),
+            'is_free' => $isFree,
+            'can_download' => $request->boolean('can_download', true),
+            'can_purchase_alone' => $request->boolean('can_purchase_alone', false),
+            'active' => false,
+            'order' => (int) ($request->order ?? 1),
         ]);
 
         InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة');
 
         return response()->json([
             'message'            => $message,
-            'lesson'             => $lesson,
+            'lesson'             => $lesson->fresh(),
             'video_provider'     => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
+    }
+
+    private function storeLessonThumbnail(Request $request, Course $course): ?string
+    {
+        if (! $request->hasFile('thumbnail')) {
+            return null;
+        }
+
+        return $request->file('thumbnail')->store(
+            'thumbnails/lessons/course_'.$course->id,
+            'public'
+        );
+    }
+
+    private function deleteStoredThumbnailIfRelative(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return;
+        }
+        Storage::disk('public')->delete($path);
     }
 }
 
