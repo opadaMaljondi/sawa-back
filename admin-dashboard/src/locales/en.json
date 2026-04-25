@@ -301,7 +301,9 @@
         "allowInstructorContact": "Show instructor contact to students",
         "allowInstructorContactHint": "When enabled, students can see the instructor phone (WhatsApp / call).",
         "whatsappGroupLink": "WhatsApp group link (optional)",
-        "whatsappGroupLinkHint": "Group invite link; leave empty if none."
+        "whatsappGroupLinkHint": "Group invite link; leave empty if none.",
+        "expiresAt": "Course end date (cycle)",
+        "expiresAtHint": "Last calendar day of this course cycle. The day after, active enrollments are deactivated by the daily job (no deletion). Leave empty if not used."
     },
     "permissions": {
         "title": "Permission Management",
@@ -420,7 +422,9 @@
         "privacyPolicy": "Privacy policy",
         "privacyPolicyPlaceholder": "Full privacy policy text for the app…",
         "termsAndConditions": "Terms and conditions",
-        "termsPlaceholder": "Full terms text for the app…"
+        "termsPlaceholder": "Full terms text for the app…",
+        "expiredCourseReEnrollmentDiscountPercent": "Re-enrollment discount after course cycle ended (%)",
+        "expiredCourseReEnrollmentDiscountHint": "Applied to the course list price for students who had a previous (inactive) enrollment on the same course after expires_at has passed. 0 disables. Runs before referral and coupon discounts."
     },
     "support": {
         "title": "Support inbox",

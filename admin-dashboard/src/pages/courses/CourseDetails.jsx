@@ -698,6 +698,12 @@ const CourseDetails = () => {
               <p className="text-gray-700">{course.price ?? '-'}</p>
             </div>
             <div>
+              <p className="mb-1"><strong>{t('courses.expiresAt')}:</strong></p>
+              <p className="text-gray-700">
+                {course.expires_at ? String(course.expires_at).slice(0, 10) : '—'}
+              </p>
+            </div>
+            <div>
               <p className="mb-1"><strong>عمولة الإدارة (%):</strong></p>
               <p className="text-gray-700">
                 {course.admin_commission != null && course.admin_commission !== ''

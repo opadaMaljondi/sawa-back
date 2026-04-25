@@ -27,6 +27,7 @@ const CourseForm = () => {
     allow_lesson_purchase: false,
     allow_instructor_contact: false,
     whatsapp_group_link: '',
+    expires_at: '',
   });
   const [courseImage, setCourseImage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,7 @@ const CourseForm = () => {
           allow_lesson_purchase: !!res.allow_lesson_purchase,
           allow_instructor_contact: !!res.allow_instructor_contact,
           whatsapp_group_link: res.whatsapp_group_link || '',
+          expires_at: res.expires_at ? String(res.expires_at).slice(0, 10) : '',
         });
         setCourseImage(null);
       } catch (e) {
@@ -107,6 +109,7 @@ const CourseForm = () => {
       fd.append('allow_lesson_purchase', form.allow_lesson_purchase ? '1' : '0');
       fd.append('allow_instructor_contact', form.allow_instructor_contact ? '1' : '0');
       fd.append('whatsapp_group_link', form.whatsapp_group_link?.trim() || '');
+      fd.append('expires_at', form.expires_at?.trim() || '');
 
       if (courseImage) {
         fd.append('image', courseImage);
@@ -216,6 +219,15 @@ const CourseForm = () => {
             fullWidth
           />
           <p className="text-xs text-gray-500 -mt-2">{t('courses.adminCommissionHint')}</p>
+
+          <Input
+            label={t('courses.expiresAt')}
+            type="date"
+            value={form.expires_at}
+            onChange={handleChange('expires_at')}
+            fullWidth
+          />
+          <p className="text-xs text-gray-500 -mt-2">{t('courses.expiresAtHint')}</p>
 
           <div>
             <label className="input-label">صورة الكورس (Banner)</label>

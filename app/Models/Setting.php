@@ -31,6 +31,7 @@ class Setting extends Model
         'support_telegram' => ['type' => 'string', 'description' => 'تيليجرام الدعم'],
         'privacy_policy' => ['type' => 'string', 'description' => 'سياسة الخصوصية (تطبيق الطالب)'],
         'terms_and_conditions' => ['type' => 'string', 'description' => 'الشروط والأحكام (تطبيق الطالب)'],
+        'expired_course_re_enrollment_discount_percent' => ['type' => 'number', 'description' => 'خصم إعادة اشتراك بعد انتهاء الكورس (% من السعر الأساسي لمن اشترك سابقاً، 0 لتعطيل)'],
     ];
 
     protected $fillable = [

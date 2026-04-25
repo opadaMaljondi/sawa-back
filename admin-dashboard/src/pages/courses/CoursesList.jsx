@@ -185,6 +185,7 @@ const CoursesList = () => {
                                         <th>{t('courses.instructor')}</th>
                                         <th>الطلاب</th>
                                         <th>{t('courses.videos')}</th>
+                                        <th>{t('courses.expiresAt')}</th>
                                         <th>{t('common.status')}</th>
                                         <th>{t('common.actions')}</th>
                                     </tr>
@@ -201,6 +202,11 @@ const CoursesList = () => {
                                                     <Video size={14} />
                                                     <span>{course.sections?.reduce((sum, s) => sum + (s.lessons?.length || 0), 0) ?? '-'}</span>
                                                 </div>
+                                            </td>
+                                            <td className="text-gray-600 text-sm whitespace-nowrap">
+                                                {course.expires_at
+                                                    ? String(course.expires_at).slice(0, 10)
+                                                    : '—'}
                                             </td>
                                             <td>
                                                 <span className={`status-badge status-${course.status === 'published' ? 'active' : 'inactive'}`}>

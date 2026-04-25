@@ -27,7 +27,12 @@ const ALLOWED_SETTING_KEYS = [
     'support_telegram',
     'privacy_policy',
     'terms_and_conditions',
+    'expired_course_re_enrollment_discount_percent',
 ];
+
+const SYSTEM_DEFAULTS = {
+    expired_course_re_enrollment_discount_percent: '0',
+};
 
 const REFERRAL_DEFAULTS = {
     referral_program_enabled: 'true',
@@ -65,7 +70,7 @@ const SettingsPage = () => {
             const res = await settingsAPI.getAll();
             setSettings(res);
 
-            const data = { ...SUPPORT_LEGAL_DEFAULTS, ...REFERRAL_DEFAULTS };
+            const data = { ...SUPPORT_LEGAL_DEFAULTS, ...REFERRAL_DEFAULTS, ...SYSTEM_DEFAULTS };
             res.forEach((item) => {
                 data[item.key] = item.value;
             });
@@ -315,6 +320,18 @@ const SettingsPage = () => {
                                     <span>{t('common.systemMode')}</span>
                                 </button>
                             </div>
+                        </div>
+                        <p className="settings-hint">{t('settings.expiredCourseReEnrollmentDiscountHint')}</p>
+                        <div className="form-item">
+                            <label>{t('settings.expiredCourseReEnrollmentDiscountPercent')}</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={formData.expired_course_re_enrollment_discount_percent ?? '0'}
+                                onChange={(e) => handleChange('expired_course_re_enrollment_discount_percent', e.target.value)}
+                            />
                         </div>
                     </div>
                 );

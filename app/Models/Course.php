@@ -31,6 +31,7 @@ class Course extends Model
         'students_count_display',
         'rating',
         'reviews_count',
+        'expires_at',
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Course extends Model
         'students_count_display' => 'integer',
         'rating' => 'decimal:2',
         'reviews_count' => 'integer',
+        'expires_at' => 'date',
     ];
 
     public function getImageAttribute($value): ?string

@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\Note;
 use App\Services\CouponService;
 use App\Services\CourseCommissionService;
+use App\Services\CourseRenewalDiscountService;
 use App\Services\InstructorEnrollmentWalletService;
 use App\Services\ReferralService;
 use App\Services\WalletService;
@@ -20,14 +21,18 @@ class EnrollmentController extends Controller
     protected CouponService $couponService;
     protected ReferralService $referralService;
 
+    protected CourseRenewalDiscountService $renewalDiscountService;
+
     public function __construct(
         WalletService $walletService,
         CouponService $couponService,
-        ReferralService $referralService
+        ReferralService $referralService,
+        CourseRenewalDiscountService $renewalDiscountService
     ) {
         $this->walletService   = $walletService;
         $this->couponService   = $couponService;
         $this->referralService = $referralService;
+        $this->renewalDiscountService = $renewalDiscountService;
     }
 
     /**
@@ -95,9 +100,15 @@ class EnrollmentController extends Controller
             );
 
             $originalPrice = $price;
-            $discount           = 0;
-            $referralDiscount   = $this->referralService->computeFirstSubscriptionDiscount($student->id, $price);
-            $couponCode         = null;
+            $discount = 0;
+            $renewalDiscount = $this->renewalDiscountService->computeDiscountAmount($course, $student->id, $price);
+            if ($renewalDiscount > 0) {
+                $discount += $renewalDiscount;
+                $price = max(0, round($price - $renewalDiscount, 2));
+            }
+
+            $referralDiscount = $this->referralService->computeFirstSubscriptionDiscount($student->id, $price);
+            $couponCode = null;
 
             if ($referralDiscount > 0) {
                 $discount += $referralDiscount;
@@ -140,6 +151,7 @@ class EnrollmentController extends Controller
                     'course_id' => $course->id,
                     'type' => $request->type,
                     'referral_discount' => $referralDiscount,
+                    'renewal_discount' => $renewalDiscount,
                     'admin_commission_percent' => $commission['admin_commission_percent'],
                     'platform_amount' => $commission['platform_amount'],
                     'instructor_amount' => $commission['instructor_amount'],
@@ -157,6 +169,7 @@ class EnrollmentController extends Controller
                 'original_price' => $originalPrice,
                 'discount' => $discount,
                 'referral_discount' => $referralDiscount,
+                'renewal_discount' => $renewalDiscount,
                 'final_price' => $finalPrice,
                 'admin_commission_percent' => $commission['admin_commission_percent'],
                 'platform_amount' => $commission['platform_amount'],
@@ -201,6 +214,7 @@ class EnrollmentController extends Controller
                     'platform_amount' => $commission['platform_amount'],
                     'instructor_amount' => $commission['instructor_amount'],
                 ],
+                'renewal_discount' => $renewalDiscount,
             ], 201);
         });
     }

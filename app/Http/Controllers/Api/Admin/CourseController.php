@@ -73,6 +73,7 @@ class CourseController extends Controller
             'whatsapp_group_link' => 'nullable|string|max:500',
             'status' => 'nullable|in:draft,pending,published',
             'active' => 'boolean',
+            'expires_at' => 'nullable|date',
         ]);
 
         $instructor = User::find($request->instructor_id);
@@ -104,6 +105,7 @@ class CourseController extends Controller
             'whatsapp_group_link' => $request->input('whatsapp_group_link'),
             'status' => $request->input('status', 'published'),
             'active' => $request->boolean('active', true),
+            'expires_at' => $request->filled('expires_at') ? $request->date('expires_at') : null,
         ]);
 
         return response()->json([
@@ -137,13 +139,14 @@ class CourseController extends Controller
             'status' => 'sometimes|in:draft,pending,published',
             'active' => 'sometimes|boolean',
             'students_count_display' => 'sometimes|nullable|integer|min:0',
+            'expires_at' => 'nullable|date',
         ]);
 
         $data = $request->only([
             'title', 'description', 'price', 'admin_commission',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
             'whatsapp_group_link',
-            'status', 'active', 'students_count_display',
+            'status', 'active', 'students_count_display', 'expires_at',
         ]);
 
         if ($request->has('allow_instructor_contact')) {
@@ -162,6 +165,9 @@ class CourseController extends Controller
 
         if (array_key_exists('students_count_display', $data) && $data['students_count_display'] === '') {
             $data['students_count_display'] = null;
+        }
+        if (array_key_exists('expires_at', $data) && ($data['expires_at'] === '' || $data['expires_at'] === null)) {
+            $data['expires_at'] = null;
         }
 
         $course->update($data);

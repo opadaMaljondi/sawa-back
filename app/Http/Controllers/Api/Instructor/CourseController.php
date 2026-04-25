@@ -110,6 +110,7 @@ class CourseController extends Controller
             'free_first_lesson' => 'boolean',
             'allow_instructor_contact' => 'boolean',
             'whatsapp_group_link' => 'nullable|string|max:500',
+            'expires_at' => 'nullable|date',
         ]);
 
         // التحقق من الصلاحيات
@@ -139,6 +140,7 @@ class CourseController extends Controller
             'whatsapp_group_link' => $request->input('whatsapp_group_link'),
             'status' => 'pending',
             'active' => false,
+            'expires_at' => $request->filled('expires_at') ? $request->date('expires_at') : null,
         ]);
 
         InstructorAdminNotifier::notify(
@@ -181,15 +183,20 @@ class CourseController extends Controller
             'free_first_lesson' => 'boolean',
             'allow_instructor_contact' => 'boolean',
             'whatsapp_group_link' => 'nullable|string|max:500',
+            'expires_at' => 'nullable|date',
         ]);
 
         $data = $request->only([
             'title', 'description', 'price',
             'allow_section_purchase', 'allow_lesson_purchase', 'free_first_lesson',
             'whatsapp_group_link',
+            'expires_at',
         ]);
         if ($request->has('allow_instructor_contact')) {
             $data['allow_instructor_contact'] = $request->boolean('allow_instructor_contact');
+        }
+        if (array_key_exists('expires_at', $data) && ($data['expires_at'] === '' || $data['expires_at'] === null)) {
+            $data['expires_at'] = null;
         }
 
         if ($request->hasFile('image')) {

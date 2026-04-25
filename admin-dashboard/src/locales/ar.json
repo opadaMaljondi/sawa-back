@@ -301,7 +301,9 @@
         "allowInstructorContact": "السماح بعرض وسيلة التواصل للطلاب",
         "allowInstructorContactHint": "عند التفعيل يظهر رقم الأستاذ للطلاب (واتساب / اتصال).",
         "whatsappGroupLink": "رابط مجموعة واتساب (اختياري)",
-        "whatsappGroupLinkHint": "رابط دعوة القروب؛ يمكن تركه فارغاً."
+        "whatsappGroupLinkHint": "رابط دعوة القروب؛ يمكن تركه فارغاً.",
+        "expiresAt": "تاريخ انتهاء الكورس (الدورة)",
+        "expiresAtHint": "آخر يوم تقويمي لهذه الدورة. في الصباح التالي يعطّل النظام الاشتراكات النشطة دون حذفها. اتركه فارغاً إن لم تُستخدم الميزة."
     },
     "permissions": {
         "title": "إدارة الصلاحيات",
@@ -420,7 +422,9 @@
         "privacyPolicy": "سياسة الخصوصية",
         "privacyPolicyPlaceholder": "نص سياسة الخصوصية الكامل للتطبيق…",
         "termsAndConditions": "الشروط والأحكام",
-        "termsPlaceholder": "نص الشروط والأحكام الكامل للتطبيق…"
+        "termsPlaceholder": "نص الشروط والأحكام الكامل للتطبيق…",
+        "expiredCourseReEnrollmentDiscountPercent": "خصم إعادة الاشتراك بعد انتهاء الدورة (%)",
+        "expiredCourseReEnrollmentDiscountHint": "يُطبَّق على السعر الأساسي للكورس لمن كان لديه اشتراك سابق (غير نشط) على نفس الكورس بعد تجاوز تاريخ الانتهاء. 0 يعطّل الخصم. يُحتسب قبل خصم الإحالة والكوبون."
     },
     "support": {
         "title": "صندوق الدعم",
