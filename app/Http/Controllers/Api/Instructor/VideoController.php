@@ -15,6 +15,12 @@ use Illuminate\Validation\Rule;
 
 class VideoController extends Controller
 {
+    /** مفاتيح يُسمح بدمجها من حقل metadata (JSON) مع multipart */
+    private const LESSON_METADATA_JSON_KEYS = [
+        'course_id', 'section_id', 'title', 'description', 'duration', 'price',
+        'is_free', 'can_download', 'can_purchase_alone', 'order', 'video_provider',
+    ];
+
     public function __construct(
         protected YouTubeService $youtubeService,
         protected LessonVideoProcessingService $lessonVideoProcessing
@@ -31,6 +37,10 @@ class VideoController extends Controller
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
+        if ($err = $this->mergeLessonMetadataJson($request)) {
+            return $err;
+        }
+
         $request->validate([
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
@@ -39,6 +49,7 @@ class VideoController extends Controller
             'can_download' => 'boolean',
             'order' => 'nullable|integer',
             'video_provider' => 'nullable|in:youtube,local,aws',
+            'metadata' => 'nullable|string|max:65535',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())
@@ -113,10 +124,10 @@ class VideoController extends Controller
             'course_id' => $course->id,
             'section_id' => $request->section_id,
             'title' => $request->title,
-            'description' => $request->input('description'),
+            'description' => $this->normalizedLessonDescription($request),
             'duration' => (int) $request->duration,
             'thumbnail' => $thumbnailPath,
-            'price' => $isFree ? 0 : ($request->filled('price') ? (float) $request->input('price') : null),
+            'price' => $this->resolvedLessonPrice($request, $isFree),
             'video_provider' => $videoProvider,
             'video_reference' => $videoReference,
             'is_free' => $isFree,
@@ -314,6 +325,10 @@ class VideoController extends Controller
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
+        if ($err = $this->mergeLessonMetadataJson($request)) {
+            return $err;
+        }
+
         $maxTotalKb = max(1, (int) config('video.max_video_kb', 512000));
 
         $request->validate([
@@ -327,6 +342,7 @@ class VideoController extends Controller
             'can_download' => 'boolean',
             'can_purchase_alone' => 'boolean',
             'order' => 'nullable|integer',
+            'metadata' => 'nullable|string|max:65535',
         ]);
 
         $course = Course::where('instructor_id', auth()->id())->findOrFail($request->course_id);
@@ -430,10 +446,10 @@ class VideoController extends Controller
             'course_id' => $course->id,
             'section_id' => $request->section_id,
             'title' => $request->title,
-            'description' => $request->input('description'),
+            'description' => $this->normalizedLessonDescription($request),
             'duration' => (int) $request->duration,
             'thumbnail' => $thumbnailPath,
-            'price' => $isFree ? 0 : ($request->filled('price') ? (float) $request->input('price') : null),
+            'price' => $this->resolvedLessonPrice($request, $isFree),
             'video_provider' => $videoProvider,
             'video_reference' => $videoReference,
             'is_free' => $isFree,
@@ -474,6 +490,56 @@ class VideoController extends Controller
             return;
         }
         Storage::disk('public')->delete($path);
+    }
+
+    /**
+     * دمج حقول النموذج المرسلة كسلسلة JSON في حقل metadata (مفيد مع multipart / chunk).
+     *
+     * @return \Illuminate\Http\JsonResponse|null
+     */
+    private function mergeLessonMetadataJson(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        if (! $request->filled('metadata')) {
+            return null;
+        }
+        $decoded = json_decode((string) $request->input('metadata'), true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return response()->json(['message' => 'Invalid JSON in metadata field.'], 422);
+        }
+        if (! is_array($decoded)) {
+            return response()->json(['message' => 'metadata must be a JSON object.'], 422);
+        }
+        $subset = array_intersect_key($decoded, array_flip(self::LESSON_METADATA_JSON_KEYS));
+        if ($subset !== []) {
+            $request->merge($subset);
+        }
+
+        return null;
+    }
+
+    private function normalizedLessonDescription(Request $request): ?string
+    {
+        if (! $request->exists('description')) {
+            return null;
+        }
+        $d = $request->input('description');
+        if ($d === null || $d === '') {
+            return null;
+        }
+
+        return is_string($d) ? $d : (string) $d;
+    }
+
+    private function resolvedLessonPrice(Request $request, bool $isFree): ?float
+    {
+        if ($isFree) {
+            return 0.0;
+        }
+        if ($request->exists('price') && $request->input('price') !== '' && $request->input('price') !== null) {
+            return (float) $request->input('price');
+        }
+
+        return null;
     }
 }
 
