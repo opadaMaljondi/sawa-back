@@ -174,12 +174,18 @@ export const videosAPI = {
       timeout: 0, // no timeout for large video uploads
       onUploadProgress,
     }),
+  /** Resume info: next_chunk_index, chunks_on_disk, all_chunks_received */
+  getChunkUploadStatus: (params) => api.get('/admin/videos/chunk/status', { params }),
+  /** Delete partial chunks on server (cancel session). */
+  abandonChunkUpload: (params) =>
+    api.delete('/admin/videos/chunk/session', { params }),
   /** One part of a chunked upload (local / aws). */
-  uploadChunk: (formData, onUploadProgress) =>
+  uploadChunk: (formData, onUploadProgress, signal) =>
     api.post('/admin/videos/chunk', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0,
       onUploadProgress,
+      signal,
     }),
   /** Merge chunks and create lesson (local / aws). */
   completeChunkUpload: (formData, onUploadProgress) =>

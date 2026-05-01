@@ -8,6 +8,7 @@ use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use App\Support\InstructorAdminNotifier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -24,8 +25,7 @@ class VideoController extends Controller
     public function __construct(
         protected YouTubeService $youtubeService,
         protected LessonVideoProcessingService $lessonVideoProcessing
-    ) {
-    }
+    ) {}
 
     /**
      * Upload video
@@ -33,7 +33,7 @@ class VideoController extends Controller
     public function upload(Request $request)
     {
         // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('create video')) {
+        if (! auth()->user()->hasPermissionTo('create video')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
@@ -70,27 +70,27 @@ class VideoController extends Controller
         $videoProvider = $request->input('video_provider', 'youtube');
 
         $tempPath = $request->file('video')->store('videos/temp', 'local');
-        $fullTempPath = storage_path('app/' . $tempPath);
+        $fullTempPath = storage_path('app/'.$tempPath);
 
         $videoReference = null;
 
         if ($videoProvider === 'aws') {
             $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $s3Path = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+            $s3Path = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
             try {
                 Storage::disk('s3')->put($s3Path, file_get_contents($fullTempPath), ['visibility' => 'public']);
             } catch (\Throwable $e) {
                 Storage::disk('local')->delete($tempPath);
 
                 return response()->json([
-                    'message' => 'Failed to upload video to S3: ' . $e->getMessage(),
+                    'message' => 'Failed to upload video to S3: '.$e->getMessage(),
                 ], 422);
             }
             Storage::disk('local')->delete($tempPath);
             $videoReference = $s3Path;
         } elseif ($videoProvider === 'local') {
             $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+            $localPath = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
             Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
             Storage::disk('local')->delete($tempPath);
             $videoReference = $localPath;
@@ -108,7 +108,7 @@ class VideoController extends Controller
                 Storage::disk('local')->delete($tempPath);
             } else {
                 $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-                $localPath = "videos/lessons/course_{$course->id}/" . Str::random(40) . '.' . $extension;
+                $localPath = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
                 Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
                 Storage::disk('local')->delete($tempPath);
                 $videoProvider = 'local';
@@ -146,7 +146,7 @@ class VideoController extends Controller
         } else {
             $message = 'Video saved locally. Waiting for admin approval.';
             if ($request->input('video_provider') === 'youtube') {
-                $message .= ' (YouTube: ' . ($this->youtubeService->getLastError() ?? 'not configured') . ')';
+                $message .= ' (YouTube: '.($this->youtubeService->getLastError() ?? 'not configured').')';
             }
         }
 
@@ -168,7 +168,7 @@ class VideoController extends Controller
         })->findOrFail($lessonId);
 
         // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('edit video')) {
+        if (! auth()->user()->hasPermissionTo('edit video')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
@@ -246,7 +246,7 @@ class VideoController extends Controller
         })->findOrFail($lessonId);
 
         // التحقق من الصلاحيات
-        if (!auth()->user()->hasPermissionTo('delete video')) {
+        if (! auth()->user()->hasPermissionTo('delete video')) {
             return response()->json(['message' => 'Permission denied'], 403);
         }
 
@@ -291,11 +291,11 @@ class VideoController extends Controller
     {
         $maxKb = max(1, (int) config('video.chunk_max_kb', 5120));
         $request->validate([
-            'upload_id'    => 'required|uuid',
-            'chunk_index'  => 'required|integer|min:0',
+            'upload_id' => 'required|uuid',
+            'chunk_index' => 'required|integer|min:0',
             'total_chunks' => 'required|integer|min:1|max:10000',
-            'chunk'        => ['required', 'file', 'max:'.$maxKb],
-            'original_name'=> 'required|string|max:255',
+            'chunk' => ['required', 'file', 'max:'.$maxKb],
+            'original_name' => 'required|string|max:255',
         ]);
 
         $ext = strtolower((string) pathinfo($request->original_name, PATHINFO_EXTENSION));
@@ -311,9 +311,40 @@ class VideoController extends Controller
         $request->file('chunk')->storeAs($dir, (string) $request->chunk_index, 'local');
 
         return response()->json([
-            'received'    => true,
+            'received' => true,
             'chunk_index' => $request->integer('chunk_index'),
         ]);
+    }
+
+    /**
+     * جلسة الرفع المجزأ: موضع الاستئناف (أول جزء مفقود).
+     */
+    public function chunkUploadStatus(Request $request)
+    {
+        $request->validate([
+            'upload_id' => 'required|uuid',
+            'total_chunks' => 'required|integer|min:1|max:10000',
+        ]);
+
+        $status = $this->lessonVideoProcessing->getChunkUploadStatus(
+            $request->input('upload_id'),
+            $request->integer('total_chunks')
+        );
+
+        return response()->json($status);
+    }
+
+    /**
+     * إلغاء جلسة الرفع المجزأ وحذف الأجزاء من التخزين المؤقت.
+     */
+    public function abandonChunkUpload(Request $request)
+    {
+        $request->validate([
+            'upload_id' => 'required|uuid',
+        ]);
+        $this->lessonVideoProcessing->deleteChunkDirectory($request->input('upload_id'));
+
+        return response()->json(['message' => 'تم إلغاء جلسة الرفع وحذف الأجزاء المؤقتة.']);
     }
 
     /**
@@ -364,14 +395,14 @@ class VideoController extends Controller
         }
 
         $uploadId = $request->upload_id;
-        $total    = $request->integer('total_chunks');
+        $total = $request->integer('total_chunks');
         $chunkDir = storage_path('app/videos/chunks/'.$uploadId);
 
         if (! is_dir($chunkDir)) {
             return response()->json(['message' => 'Upload session not found. Upload chunks first.'], 422);
         }
 
-        $outName      = Str::random(40).'.'.$ext;
+        $outName = Str::random(40).'.'.$ext;
         $tempRelative = 'videos/temp/'.$outName;
         $fullTempPath = storage_path('app/'.$tempRelative);
 
@@ -462,9 +493,9 @@ class VideoController extends Controller
         InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة');
 
         return response()->json([
-            'message'            => $message,
-            'lesson'             => $lesson->fresh(),
-            'video_provider'     => $videoProvider,
+            'message' => $message,
+            'lesson' => $lesson->fresh(),
+            'video_provider' => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
     }
@@ -494,10 +525,8 @@ class VideoController extends Controller
 
     /**
      * دمج حقول النموذج المرسلة كسلسلة JSON في حقل metadata (مفيد مع multipart / chunk).
-     *
-     * @return \Illuminate\Http\JsonResponse|null
      */
-    private function mergeLessonMetadataJson(Request $request): ?\Illuminate\Http\JsonResponse
+    private function mergeLessonMetadataJson(Request $request): ?JsonResponse
     {
         if (! $request->filled('metadata')) {
             return null;
@@ -542,4 +571,3 @@ class VideoController extends Controller
         return null;
     }
 }
-

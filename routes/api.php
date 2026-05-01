@@ -12,9 +12,9 @@ use App\Http\Controllers\Api\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Api\Admin\InstructorController as AdminInstructorController;
 use App\Http\Controllers\Api\Admin\NoteController as AdminNoteController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
-use App\Http\Controllers\Api\Admin\ReferralController as AdminReferralController;
 use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Api\Admin\ReferralController as AdminReferralController;
 use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SemesterController as AdminSemesterController;
@@ -33,8 +33,8 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\Instructor\CatalogController as InstructorCatalogController;
 use App\Http\Controllers\Api\Instructor\ChatGroupController;
 use App\Http\Controllers\Api\Instructor\CourseController as InstructorCourseController;
-use App\Http\Controllers\Api\Instructor\EarningsController as InstructorEarningsController;
 use App\Http\Controllers\Api\Instructor\CourseSectionController as InstructorCourseSectionController;
+use App\Http\Controllers\Api\Instructor\EarningsController as InstructorEarningsController;
 use App\Http\Controllers\Api\Instructor\ExamController;
 use App\Http\Controllers\Api\Instructor\HomeController as InstructorHomeController;
 use App\Http\Controllers\Api\Instructor\NoteController;
@@ -43,7 +43,6 @@ use App\Http\Controllers\Api\Instructor\SubjectController as InstructorSubjectCo
 use App\Http\Controllers\Api\Instructor\SupportController as InstructorSupportController;
 use App\Http\Controllers\Api\Instructor\VideoController;
 use App\Http\Controllers\Api\Instructor\WalletController as InstructorWalletController;
-use App\Http\Controllers\Api\UserNotificationsController;
 use App\Http\Controllers\Api\Student\ChatController;
 use App\Http\Controllers\Api\Student\CouponController as StudentCouponController;
 use App\Http\Controllers\Api\Student\CourseController as StudentCourseController;
@@ -54,6 +53,7 @@ use App\Http\Controllers\Api\Student\ReferralController;
 use App\Http\Controllers\Api\Student\SupportController as StudentSupportController;
 use App\Http\Controllers\Api\Student\VideoDownloadController;
 use App\Http\Controllers\Api\Student\WalletController;
+use App\Http\Controllers\Api\UserNotificationsController;
 use App\Models\Year;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -226,6 +226,8 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     Route::delete('courses/{courseId}/sections/{sectionId}', [InstructorCourseSectionController::class, 'destroy']);
 
     // Videos
+    Route::get('videos/chunk/status', [VideoController::class, 'chunkUploadStatus']);
+    Route::delete('videos/chunk/session', [VideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [VideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [VideoController::class, 'completeChunkUpload']);
     Route::post('videos', [VideoController::class, 'upload']);
@@ -314,6 +316,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('course-sections/{id}', [AdminCourseSectionController::class, 'destroy']);
 
     // Videos (رفع وتعديل وحذف فيديوهات لأي كورس)
+    Route::get('videos/chunk/status', [AdminVideoController::class, 'chunkUploadStatus']);
+    Route::delete('videos/chunk/session', [AdminVideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [AdminVideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [AdminVideoController::class, 'completeChunkUpload']);
     Route::post('videos', [AdminVideoController::class, 'upload']);

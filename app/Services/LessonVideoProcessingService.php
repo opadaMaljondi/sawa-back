@@ -12,9 +12,7 @@ use Illuminate\Support\Str;
  */
 class LessonVideoProcessingService
 {
-    public function __construct(protected YouTubeService $youtubeService)
-    {
-    }
+    public function __construct(protected YouTubeService $youtubeService) {}
 
     /**
      * @return array{0: string, 1: string, 2: string} [provider, reference, message]
@@ -64,8 +62,8 @@ class LessonVideoProcessingService
         }
 
         $uploadedUrl = $this->youtubeService->uploadVideo($fullTempPath, [
-            'title'          => $request->title,
-            'description'    => $request->description ?? "Course: {$course->title}",
+            'title' => $request->title,
+            'description' => $request->description ?? "Course: {$course->title}",
             'privacy_status' => 'unlisted',
         ]);
 
@@ -98,5 +96,39 @@ class LessonVideoProcessingService
             }
         }
         @rmdir($dir);
+    }
+
+    /**
+     * أول فهرس مفقود من 0..totalChunks-1، أو totalChunks إذا اكتملت كل الأجزاء على القرص.
+     *
+     * @return array{next_chunk_index: int, chunks_on_disk: int, all_chunks_received: bool}
+     */
+    public function getChunkUploadStatus(string $uploadId, int $totalChunks): array
+    {
+        $chunkDir = storage_path('app/videos/chunks/'.$uploadId);
+
+        if (! is_dir($chunkDir)) {
+            return [
+                'next_chunk_index' => 0,
+                'chunks_on_disk' => 0,
+                'all_chunks_received' => false,
+            ];
+        }
+
+        for ($i = 0; $i < $totalChunks; $i++) {
+            if (! is_file($chunkDir.DIRECTORY_SEPARATOR.$i)) {
+                return [
+                    'next_chunk_index' => $i,
+                    'chunks_on_disk' => $i,
+                    'all_chunks_received' => false,
+                ];
+            }
+        }
+
+        return [
+            'next_chunk_index' => $totalChunks,
+            'chunks_on_disk' => $totalChunks,
+            'all_chunks_received' => true,
+        ];
     }
 }

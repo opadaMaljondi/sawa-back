@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Video } from 'lucide-react';
@@ -13,6 +13,11 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 const VIDEO_CHUNK_BYTES = 4 * 1024 * 1024;
 /** Local/aws files larger than this use chunked upload. */
 const VIDEO_CHUNK_THRESHOLD = 4 * 1024 * 1024;
+
+function chunkUploadStorageKey(courseId, file) {
+  if (!file || !courseId) return '';
+  return `sawa_video_chunk:${courseId}:${file.name}:${file.size}:${file.lastModified}`;
+}
 
 const CourseDetails = () => {
   const { t } = useTranslation();
@@ -49,6 +54,12 @@ const CourseDetails = () => {
   const [lessonError, setLessonError] = useState('');
   const [lessonLoading, setLessonLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [chunkPausedUi, setChunkPausedUi] = useState(false);
+  const [chunkPartLabel, setChunkPartLabel] = useState('');
+  const chunkPauseRef = useRef(false);
+  const chunkAbortRef = useRef(false);
+  const chunkFlightAbortRef = useRef(null);
+  const chunkUploadIdRef = useRef(null);
 
   const [editLessonModalOpen, setEditLessonModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
@@ -303,6 +314,12 @@ const CourseDetails = () => {
   };
 
   const openLessonModal = () => {
+    chunkPauseRef.current = false;
+    chunkAbortRef.current = false;
+    chunkFlightAbortRef.current = null;
+    chunkUploadIdRef.current = null;
+    setChunkPausedUi(false);
+    setChunkPartLabel('');
     setLessonForm({
       title: '',
       description: '',
@@ -334,35 +351,115 @@ const CourseDetails = () => {
       setLessonError('اختر ملف الفيديو أو أدخل رابط يوتيوب');
       return;
     }
+
+    const useChunked =
+      needsUploadOnly &&
+      lessonFile &&
+      lessonFile.size > VIDEO_CHUNK_THRESHOLD;
+
+    const waitWhilePaused = async () => {
+      while (chunkPauseRef.current && !chunkAbortRef.current) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+
+    const isAbortLikeError = (err) =>
+      err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.name === 'AbortError';
+
     try {
       setLessonLoading(true);
       setUploadProgress(0);
-
-      const useChunked =
-        needsUploadOnly &&
-        lessonFile &&
-        lessonFile.size > VIDEO_CHUNK_THRESHOLD;
+      chunkPauseRef.current = false;
+      chunkAbortRef.current = false;
+      setChunkPausedUi(false);
 
       if (useChunked) {
-        const uploadId = crypto.randomUUID();
         const totalChunks = Math.ceil(lessonFile.size / VIDEO_CHUNK_BYTES) || 1;
-        for (let i = 0; i < totalChunks; i += 1) {
-          const start = i * VIDEO_CHUNK_BYTES;
-          const blob = lessonFile.slice(start, start + VIDEO_CHUNK_BYTES);
+        const lsKey = chunkUploadStorageKey(course.id, lessonFile);
+
+        let uploadId = crypto.randomUUID();
+        let startIndex = 0;
+        try {
+          const raw = localStorage.getItem(lsKey);
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved?.uploadId && Number(saved.totalChunks) === totalChunks) {
+              const st = await videosAPI.getChunkUploadStatus({
+                upload_id: saved.uploadId,
+                total_chunks: totalChunks,
+              });
+              uploadId = saved.uploadId;
+              startIndex = Number(st.next_chunk_index) || 0;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+
+        chunkUploadIdRef.current = uploadId;
+        setUploadProgress(Math.min(99, Math.round((startIndex / totalChunks) * 100)));
+
+        for (let i = startIndex; i < totalChunks; i += 1) {
+          await waitWhilePaused();
+          if (chunkAbortRef.current) {
+            try {
+              await videosAPI.abandonChunkUpload({ upload_id: uploadId });
+            } catch {
+              /* ignore */
+            }
+            localStorage.removeItem(lsKey);
+            throw new Error('UPLOAD_CANCELLED');
+          }
+
+          setChunkPartLabel(`الجزء ${i + 1} من ${totalChunks}`);
+          const sliceStart = i * VIDEO_CHUNK_BYTES;
+          const blob = lessonFile.slice(sliceStart, sliceStart + VIDEO_CHUNK_BYTES);
           const chunkFd = new FormData();
           chunkFd.append('upload_id', uploadId);
           chunkFd.append('chunk_index', String(i));
           chunkFd.append('total_chunks', String(totalChunks));
           chunkFd.append('original_name', lessonFile.name);
           chunkFd.append('chunk', blob, lessonFile.name);
-          await videosAPI.uploadChunk(chunkFd, (ev) => {
-            if (ev.total) {
-              const part = (i + ev.loaded / ev.total) / totalChunks;
-              setUploadProgress(Math.min(99, Math.round(part * 100)));
+
+          const ac = new AbortController();
+          chunkFlightAbortRef.current = ac;
+
+          try {
+            await videosAPI.uploadChunk(chunkFd, (ev) => {
+              if (ev.total) {
+                const part = (i + ev.loaded / ev.total) / totalChunks;
+                setUploadProgress(Math.min(99, Math.round(part * 100)));
+              }
+            }, ac.signal);
+          } catch (err) {
+            if (isAbortLikeError(err) && chunkAbortRef.current) {
+              try {
+                await videosAPI.abandonChunkUpload({ upload_id: uploadId });
+              } catch {
+                /* ignore */
+              }
+              localStorage.removeItem(lsKey);
+              throw new Error('UPLOAD_CANCELLED');
             }
-          });
+            throw err;
+          }
+
+          try {
+            localStorage.setItem(
+              lsKey,
+              JSON.stringify({
+                uploadId,
+                totalChunks,
+                courseId: course.id,
+                lastChunk: i,
+              }),
+            );
+          } catch {
+            /* ignore quota */
+          }
         }
 
+        setChunkPartLabel('إتمام الدمج والحفظ...');
         const fd = new FormData();
         fd.append('upload_id', uploadId);
         fd.append('total_chunks', String(totalChunks));
@@ -383,6 +480,9 @@ const CourseDetails = () => {
         await videosAPI.completeChunkUpload(fd, (ev) => {
           if (ev.total) setUploadProgress(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
         });
+
+        localStorage.removeItem(lsKey);
+        chunkUploadIdRef.current = null;
       } else {
         const fd = new FormData();
         fd.append('course_id', course.id);
@@ -413,14 +513,67 @@ const CourseDetails = () => {
       }
 
       setUploadProgress(0);
+      setChunkPartLabel('');
       setLessonModalOpen(false);
       await loadCourse();
     } catch (err) {
       console.error(err);
-      setLessonError(err.response?.data?.message || 'فشل رفع الفيديو');
+      if (err?.message === 'UPLOAD_CANCELLED') {
+        setLessonError('تم إلغاء الرفع.');
+      } else {
+        setLessonError(err.response?.data?.message || err.message || 'فشل رفع الفيديو');
+      }
     } finally {
       setLessonLoading(false);
+      chunkPauseRef.current = false;
+      chunkAbortRef.current = false;
+      chunkFlightAbortRef.current = null;
+      setChunkPausedUi(false);
     }
+  };
+
+  const toggleChunkPause = () => {
+    if (chunkPauseRef.current) {
+      chunkPauseRef.current = false;
+      setChunkPausedUi(false);
+    } else {
+      chunkPauseRef.current = true;
+      setChunkPausedUi(true);
+    }
+  };
+
+  const handleCancelChunkUploadInFlight = () => {
+    chunkAbortRef.current = true;
+    chunkPauseRef.current = false;
+    setChunkPausedUi(false);
+    chunkFlightAbortRef.current?.abort();
+  };
+
+  const handleDiscardChunkSession = async () => {
+    if (!lessonFile || !course) return;
+    const lsKey = chunkUploadStorageKey(course.id, lessonFile);
+    let id = chunkUploadIdRef.current;
+    try {
+      const raw = localStorage.getItem(lsKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.uploadId) id = saved.uploadId;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (id) {
+      try {
+        await videosAPI.abandonChunkUpload({ upload_id: id });
+      } catch {
+        /* ignore */
+      }
+    }
+    localStorage.removeItem(lsKey);
+    chunkUploadIdRef.current = null;
+    setLessonError('');
+    setUploadProgress(0);
+    setChunkPartLabel('');
   };
 
   const openEditLessonModal = (lesson) => {
@@ -1334,6 +1487,27 @@ const CourseDetails = () => {
       >
         <form onSubmit={submitLesson} className="space-y-4">
           {lessonError && <div className="login-error">{lessonError}</div>}
+          {lessonError &&
+            lessonFile &&
+            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') &&
+            lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLessonError('');
+                    void submitLesson({ preventDefault() {} });
+                  }}
+                >
+                  إعادة المحاولة من آخر جزء
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void handleDiscardChunkSession()}>
+                  مسح الجلسة والبدء من جديد
+                </Button>
+              </div>
+            )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="عنوان الدرس"
@@ -1496,10 +1670,24 @@ const CourseDetails = () => {
                   </div>
                 </div>
 
-          {lessonLoading && uploadProgress > 0 && (
+          {lessonLoading &&
+            lessonFile &&
+            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') &&
+            lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button type="button" variant="outline" size="sm" onClick={toggleChunkPause}>
+                  {chunkPausedUi ? 'استئناف' : 'إيقاف مؤقت'}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleCancelChunkUploadInFlight}>
+                  إلغاء الرفع
+                </Button>
+              </div>
+            )}
+
+          {lessonLoading && (uploadProgress > 0 || chunkPartLabel) && (
             <div style={{ margin: '8px 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <span>جاري الرفع...</span>
+                <span>{chunkPartLabel || 'جاري الرفع...'}</span>
                 <span>{uploadProgress}%</span>
               </div>
               <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8, overflow: 'hidden' }}>
