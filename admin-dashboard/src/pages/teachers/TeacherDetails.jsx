@@ -11,6 +11,20 @@ import { formatDateTime } from '../../utils/date';
 import '../students/StudentDetails.css';
 import '../permissions/RolesAndPermissions.css';
 
+/** لا تُعرَض ولن تُحفَظ لهذا الأستاذ من لوحة المنح (صلاحيات إدارية كاملة) */
+const INSTRUCTOR_PAGE_EXCLUDED_PERMISSIONS = new Set([
+  'create chat group',
+  'edit chat group',
+  'delete chat group',
+  'manage students',
+  'manage instructors',
+  'manage courses',
+  'manage banners',
+  'view reports',
+  'manage settings',
+  'manage users',
+]);
+
 const TeacherDetails = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -34,7 +48,12 @@ const TeacherDetails = () => {
 
   const [permissions, setPermissions] = useState([]);
 
-  /** نفس تجميع صفحة الأدوار: محتوى، مستخدمون، أكاديمي، أخرى */
+  const assignablePermissions = useMemo(
+    () => allPermissions.filter((p) => p?.name && !INSTRUCTOR_PAGE_EXCLUDED_PERMISSIONS.has(p.name)),
+    [allPermissions],
+  );
+
+  /** نفس تجميع صفحة الأدوار: محتوى، مستخدمون، أكاديمي، أخرى (بعد استبعاد صلاحيات الأدمن) */
   const permissionGroups = useMemo(() => {
     const groups = {
       content: { icon: <Video size={18} />, permissions: [] },
@@ -43,7 +62,7 @@ const TeacherDetails = () => {
       other: { icon: <Layout size={18} />, permissions: [] },
     };
 
-    allPermissions.forEach((perm) => {
+    assignablePermissions.forEach((perm) => {
       const n = perm.name || '';
       if (
         n.includes('video')
@@ -51,7 +70,6 @@ const TeacherDetails = () => {
         || n.includes('exam')
         || n.includes('course')
         || n.includes('section')
-        || n.includes('chat')
       ) {
         groups.content.permissions.push(perm);
       } else if (n.includes('student') || n.includes('instructor')) {
@@ -69,7 +87,7 @@ const TeacherDetails = () => {
     });
 
     return groups;
-  }, [allPermissions]);
+  }, [assignablePermissions]);
 
   const loadTeacher = async () => {
     try {
@@ -77,8 +95,8 @@ const TeacherDetails = () => {
       setError('');
       const res = await teachersAPI.getById(id);
       setTeacher(res);
-      const current = res.permissions?.map((p) => p.name) || [];
-      setPermissions(current);
+      const current = res.permissions?.map((p) => p.name).filter(Boolean) || [];
+      setPermissions(current.filter((n) => !INSTRUCTOR_PAGE_EXCLUDED_PERMISSIONS.has(n)));
     } catch (e) {
       console.error(e);
       setError('فشل تحميل بيانات الأستاذ');
@@ -406,7 +424,7 @@ const TeacherDetails = () => {
           </p>
           {permissionsLoading ? (
             <p className="text-gray-500">{t('common.loading')}</p>
-          ) : !allPermissions.length ? (
+          ) : !assignablePermissions.length ? (
             <p className="text-amber-600">تعذر تحميل قائمة الصلاحيات.</p>
           ) : (
             <div className="permissions-selector teacher-permissions-selector">
@@ -445,7 +463,7 @@ const TeacherDetails = () => {
             variant="primary"
             onClick={savePermissions}
             loading={savingPerms}
-            disabled={permissionsLoading || !allPermissions.length}
+            disabled={permissionsLoading || !assignablePermissions.length}
           >
             {t('common.save')}
           </Button>

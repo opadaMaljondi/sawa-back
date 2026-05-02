@@ -78,9 +78,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'delete exam',
             'create course',
             'edit course',
-            'create chat group',
-            'edit chat group',
-            'delete chat group',
         ];
 
         $instructorRole = Role::firstOrCreate(
