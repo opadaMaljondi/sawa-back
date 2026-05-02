@@ -25,6 +25,7 @@ const CoursesList = () => {
     const [pagination, setPagination] = useState({ current_page: 1, last_page: 1 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [deletingId, setDeletingId] = useState(null);
 
     useEffect(() => {
         const id = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
@@ -84,6 +85,24 @@ const CoursesList = () => {
         if (status === 'pending') return t('courses.statePending');
         if (status === 'draft') return t('courses.stateDraft');
         return status || '—';
+    };
+
+    const handleDeleteCourse = async (course) => {
+        const label = course?.title ? `«${course.title}»` : `«${t('courses.courseName')} #${course.id}»`;
+        if (!window.confirm(`${t('courses.confirmDeleteCourse')}\n${label}`)) {
+            return;
+        }
+        try {
+            setDeletingId(course.id);
+            setError('');
+            await coursesAPI.delete(course.id);
+            await fetchCourses(pagination.current_page);
+        } catch (e) {
+            console.error(e);
+            setError(e.response?.data?.message || 'فشل حذف الكورس');
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     return (
@@ -230,7 +249,13 @@ const CoursesList = () => {
                                                     >
                                                         <Edit size={16} />
                                                     </button>
-                                                    <button className="action-btn action-btn-delete" title={t('common.delete')}>
+                                                    <button
+                                                        type="button"
+                                                        className="action-btn action-btn-delete"
+                                                        title={t('common.delete')}
+                                                        disabled={deletingId === course.id}
+                                                        onClick={() => handleDeleteCourse(course)}
+                                                    >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>

@@ -303,7 +303,8 @@
         "whatsappGroupLink": "WhatsApp group link (optional)",
         "whatsappGroupLinkHint": "Group invite link; leave empty if none.",
         "expiresAt": "Course end date (cycle)",
-        "expiresAtHint": "Last calendar day of this course cycle. The day after, active enrollments are deactivated by the daily job (no deletion). Leave empty if not used."
+        "expiresAtHint": "Last calendar day of this course cycle. The day after, active enrollments are deactivated by the daily job (no deletion). Leave empty if not used.",
+        "confirmDeleteCourse": "Permanently delete this course from the system?"
     },
     "permissions": {
         "title": "Permission Management",
