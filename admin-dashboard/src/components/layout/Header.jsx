@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -44,15 +44,62 @@ const Header = ({ onMenuClick }) => {
     const [browserNotifPermission, setBrowserNotifPermission] = useState(getBrowserNotificationPermission);
     const notificationRef = useRef(null);
     const profileRef = useRef(null);
+    /** لتجنب إشعار سطح المكتب عند أول تحميل للعداد */
+    const prevUnreadForDesktopRef = useRef(null);
+    const lastDesktopNotifAtRef = useRef(0);
 
     const isAdminDesktopAlerts =
         user?.type === 'admin' && isFirebaseClientConfigured() && browserNotifPermission !== 'unsupported';
 
+    const fetchUnreadCount = useCallback(async () => {
+        try {
+            const res = await notificationsAPI.getUnreadCount();
+            const newCount = Number(res?.unread_count ?? 0);
+            const prev = prevUnreadForDesktopRef.current;
+
+            setUnreadCount(newCount);
+
+            if (
+                user?.type === 'admin' &&
+                typeof Notification !== 'undefined' &&
+                Notification.permission === 'granted' &&
+                prev !== null &&
+                newCount > prev
+            ) {
+                try {
+                    const page = await notificationsAPI.getNotifications(1);
+                    const list = Array.isArray(page?.data) ? page.data : [];
+                    const newest = list[0];
+                    if (newest && newest.read === false) {
+                        const now = Date.now();
+                        if (now - lastDesktopNotifAtRef.current >= 2500) {
+                            lastDesktopNotifAtRef.current = now;
+                            new Notification(newest.title || 'Sawa', {
+                                body: newest.message || '',
+                                tag: `sawa-notification-${newest.id}`,
+                            });
+                        }
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+
+            prevUnreadForDesktopRef.current = newCount;
+        } catch (error) {
+            console.error('Error fetching unread count:', error);
+        }
+    }, [user?.type]);
+
     useEffect(() => {
+        if (!isAuthenticated || user?.type !== 'admin') {
+            prevUnreadForDesktopRef.current = null;
+            return undefined;
+        }
         fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 60000); // Poll every minute
+        const interval = setInterval(fetchUnreadCount, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [isAuthenticated, user?.type, fetchUnreadCount]);
 
     /** استقبال فوري من Firebase Realtime (نفس مسار الخادم: sawa/admin_alerts) */
     useEffect(() => {
@@ -72,10 +119,15 @@ const Header = ({ onMenuClick }) => {
                         Notification.permission === 'granted' &&
                         (payload.title || payload.body)
                     ) {
+                        const now = Date.now();
+                        if (now - lastDesktopNotifAtRef.current < 2500) {
+                            return;
+                        }
+                        lastDesktopNotifAtRef.current = now;
                         try {
                             new Notification(payload.title || 'Sawa', {
                                 body: payload.body || '',
-                                tag: 'sawa-admin-alert',
+                                tag: `sawa-admin-rtdb-${payload.sent_at || now}`,
                             });
                         } catch {
                             /* ignore */
@@ -96,7 +148,7 @@ const Header = ({ onMenuClick }) => {
             cancelled = true;
             unsubscribe();
         };
-    }, [isAuthenticated, user?.type]);
+    }, [isAuthenticated, user?.type, browserNotifPermission]);
 
     useEffect(() => {
         if (showNotifications) {
@@ -117,15 +169,6 @@ const Header = ({ onMenuClick }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const fetchUnreadCount = async () => {
-        try {
-            const res = await notificationsAPI.getUnreadCount();
-            setUnreadCount(res.unread_count);
-        } catch (error) {
-            console.error('Error fetching unread count:', error);
-        }
-    };
 
     const fetchRecentNotifications = async () => {
         setLoading(true);

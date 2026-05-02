@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase, ref, get, onChildAdded } from 'firebase/database';
+import { getDatabase, ref, get, onChildAdded, query, orderByKey, limitToLast } from 'firebase/database';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 
 /**
@@ -47,7 +47,11 @@ export function getFirebaseApp() {
 }
 
 /**
- * الاستماع لإدخالات جديدة فقط (تجاهل أطفال موجودين قبل الاشتراك).
+ * الاستماع لإدخالات جديدة تحت admin_alerts.
+ *
+ * لا نعتمد على get() لكامل الشجرة (قد يفشل أو يتعطل مع آلاف السجلات).
+ * نستخدم sent_at من الخادم: أي حدث أقدم من لحظة الاشتراك بأكثر من maxPastMs
+ * يُعتبر أرشيفاً عند أول sync ولا يُطلق له إشعار سطح المكتب.
  *
  * @param {(payload: Record<string, string>) => void} onNewAlert
  * @returns {Promise<() => void>}
@@ -72,23 +76,43 @@ export async function subscribeAdminAlerts(onNewAlert) {
 
     const db = getDatabase(app);
     const r = ref(db, adminAlertsDatabasePath());
-    let initial;
+    const notifiedKeys = new Set();
+    const subscribedAtMs = Date.now();
+    /** هامش زمني (ساعة الخادم مقابل العميل + تأخر الشبكة) */
+    const maxPastMs = 120_000;
+
     try {
-        initial = await get(r);
+        await get(query(r, orderByKey(), limitToLast(1)));
     } catch (e) {
-        console.warn('[firebase] Could not read admin_alerts. Check Realtime rules and databaseURL:', e);
-        return () => {};
+        console.warn(
+            '[firebase] Could not read admin_alerts tail (rules/databaseURL). Still listening for new children:',
+            e,
+        );
     }
 
-    const seen = new Set(initial.exists() ? Object.keys(initial.val()) : []);
-
     const unsubscribe = onChildAdded(r, (snapshot) => {
-        if (seen.has(snapshot.key)) {
+        const key = snapshot.key;
+        if (!key || notifiedKeys.has(key)) {
             return;
         }
-        seen.add(snapshot.key);
         const val = snapshot.val();
-        onNewAlert(typeof val === 'object' && val !== null ? val : {});
+        if (typeof val !== 'object' || val === null) {
+            notifiedKeys.add(key);
+            return;
+        }
+        const sentAtRaw = val.sent_at;
+        const sentAtMs = typeof sentAtRaw === 'string' ? Date.parse(sentAtRaw) : NaN;
+        const now = Date.now();
+        const freshEnough =
+            Number.isFinite(sentAtMs) &&
+            sentAtMs >= subscribedAtMs - maxPastMs &&
+            sentAtMs <= now + 120_000;
+        if (!freshEnough) {
+            notifiedKeys.add(key);
+            return;
+        }
+        notifiedKeys.add(key);
+        onNewAlert(val);
     });
 
     return () => unsubscribe();
