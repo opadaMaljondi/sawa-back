@@ -56,7 +56,10 @@ class ExamController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تمت إضافة امتحان جديد يحتاج مراجعة');
+        InstructorAdminNotifier::notify($course, 'تمت إضافة امتحان جديد يحتاج مراجعة', null, [
+            'type' => 'instructor_exam_created',
+            'exam_id' => $exam->id,
+        ]);
 
         return response()->json([
             'message' => 'Exam created successfully. Waiting for admin approval.',

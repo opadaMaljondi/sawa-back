@@ -77,7 +77,10 @@ class NoteController extends Controller
             'active' => false, // يحتاج موافقة الأدمن
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تمت إضافة مرفق / ملاحظة جديدة تنتظر المراجعة');
+        InstructorAdminNotifier::notify($course, 'تمت إضافة مرفق / ملاحظة جديدة تنتظر المراجعة', null, [
+            'type' => 'instructor_note_created',
+            'note_id' => $note->id,
+        ]);
 
         return response()->json([
             'message' => 'Note created successfully. Waiting for admin approval.',

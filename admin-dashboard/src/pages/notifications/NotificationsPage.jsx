@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     Bell, Send, Users, User, BookOpen, Loader2, Info,
@@ -10,9 +11,14 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { notificationsAPI, studentsAPI, coursesAPI } from '../../services/api';
 import './NotificationsPage.css';
+import {
+    adminNotificationIsClickable,
+    navigateFromAdminNotification,
+} from '../../utils/adminNotificationNavigate';
 
 const NotificationsPage = () => {
     const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' or 'compose'
 
     // Compose State
@@ -80,7 +86,12 @@ const NotificationsPage = () => {
         }
     };
 
-    const handleMarkAsRead = async (id) => {
+    const handleInboxNavigate = (notification) => {
+        navigateFromAdminNotification(navigate, notification?.data);
+    };
+
+    const handleMarkAsRead = async (e, id) => {
+        e?.stopPropagation?.();
         try {
             await notificationsAPI.markAsRead(id);
             setNotifications(prev => prev.map(n =>
@@ -183,10 +194,22 @@ const NotificationsPage = () => {
                             </div>
                         ) : (
                             <div className="notifications-list">
-                                {notifications?.map(notification => (
+                                {notifications?.map(notification => {
+                                    const clickable = adminNotificationIsClickable(notification.data);
+                                    return (
                                     <div
                                         key={notification.id}
-                                        className={`notification-item ${notification.read ? 'read' : 'unread'}`}
+                                        role={clickable ? 'button' : undefined}
+                                        tabIndex={clickable ? 0 : undefined}
+                                        className={`notification-item ${notification.read ? 'read' : 'unread'} ${clickable ? 'notification-item-action' : ''}`}
+                                        onClick={() => handleInboxNavigate(notification)}
+                                        onKeyDown={(e) => {
+                                            if (!clickable) return;
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleInboxNavigate(notification);
+                                            }
+                                        }}
                                     >
                                         <div className="notif-icon-col">
                                             <div className={`type-icon ${notification.data?.type || 'system'}`}>
@@ -206,7 +229,7 @@ const NotificationsPage = () => {
                                             {!notification.read && (
                                                 <button
                                                     className="mark-read-btn"
-                                                    onClick={() => handleMarkAsRead(notification.id)}
+                                                    onClick={(e) => handleMarkAsRead(e, notification.id)}
                                                 >
                                                     <Check size={14} />
                                                     <span>{t('notifications.markAsRead')}</span>
@@ -221,7 +244,8 @@ const NotificationsPage = () => {
                                             )}
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 

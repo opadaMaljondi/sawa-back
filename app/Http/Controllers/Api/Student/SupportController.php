@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\SupportMessage;
+use App\Support\SupportAdminNotifier;
 use Illuminate\Http\Request;
 
 class SupportController extends Controller
@@ -36,7 +37,7 @@ class SupportController extends Controller
             'message' => 'required|string|max:2000',
         ]);
 
-        SupportMessage::create([
+        $supportMessage = SupportMessage::create([
             'user_id' => $user->id,
             'name'    => $user->full_name,
             'email'   => $user->email,
@@ -44,6 +45,8 @@ class SupportController extends Controller
             'message' => $data['message'],
             'status'  => 'new',
         ]);
+
+        SupportAdminNotifier::notify($supportMessage);
 
         return response()->json([
             'message' => 'Your message has been sent. We will get back to you soon.',

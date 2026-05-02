@@ -137,7 +137,10 @@ class VideoController extends Controller
             'order' => (int) ($request->order ?? 1),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تم رفع درس فيديو جديد يحتاج مراجعة');
+        InstructorAdminNotifier::notify($course, 'تم رفع درس فيديو جديد يحتاج مراجعة', null, [
+            'type' => 'instructor_lesson_pending',
+            'lesson_id' => $lesson->id,
+        ]);
 
         if ($videoProvider === 'youtube') {
             $message = 'Video uploaded successfully. Waiting for admin approval.';
@@ -490,7 +493,10 @@ class VideoController extends Controller
             'order' => (int) ($request->order ?? 1),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة');
+        InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة', null, [
+            'type' => 'instructor_lesson_pending',
+            'lesson_id' => $lesson->id,
+        ]);
 
         return response()->json([
             'message' => $message,

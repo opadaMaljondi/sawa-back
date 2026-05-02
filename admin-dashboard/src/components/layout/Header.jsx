@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -26,11 +26,16 @@ import {
     getBrowserNotificationPermission,
     requestBrowserNotificationPermission as requestDesktopNotificationPermission,
 } from '../../utils/browserNotifications';
+import {
+    adminNotificationIsClickable,
+    navigateFromAdminNotification,
+} from '../../utils/adminNotificationNavigate';
 import './Header.css';
 
 const Header = ({ onMenuClick }) => {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
     const { language, toggleLanguage } = useLanguage();
     const { theme, toggleTheme } = useTheme();
     const { user, logout, isAuthenticated } = useAuth();
@@ -202,6 +207,13 @@ const Header = ({ onMenuClick }) => {
         setShowNotifications(!showNotifications);
     };
 
+    const handleNotificationNavigate = (notif) => {
+        const done = navigateFromAdminNotification(navigate, notif?.data);
+        if (done) {
+            setShowNotifications(false);
+        }
+    };
+
     const handleMarkAsRead = async (e, id) => {
         e.stopPropagation();
         e.preventDefault();
@@ -299,8 +311,23 @@ const Header = ({ onMenuClick }) => {
                                         <p>لا توجد إشعارات</p>
                                     </div>
                                 ) : (
-                                    notifications.map(notif => (
-                                        <div key={notif.id} className={`notif-dropdown-item ${notif.read ? 'read' : 'unread'}`}>
+                                    notifications.map(notif => {
+                                        const clickable = adminNotificationIsClickable(notif.data);
+                                        return (
+                                        <div
+                                            key={notif.id}
+                                            role={clickable ? 'button' : undefined}
+                                            tabIndex={clickable ? 0 : undefined}
+                                            className={`notif-dropdown-item ${notif.read ? 'read' : 'unread'} ${clickable ? 'notif-dropdown-item-action' : ''}`}
+                                            onClick={() => handleNotificationNavigate(notif)}
+                                            onKeyDown={(e) => {
+                                                if (!clickable) return;
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleNotificationNavigate(notif);
+                                                }
+                                            }}
+                                        >
                                             <div className="notif-dot"></div>
                                             <div className="notif-info">
                                                 <p className="notif-title">{notif.title}</p>
@@ -320,7 +347,8 @@ const Header = ({ onMenuClick }) => {
                                                 </button>
                                             )}
                                         </div>
-                                    ))
+                                    );
+                                    })
                                 )}
                             </div>
 
