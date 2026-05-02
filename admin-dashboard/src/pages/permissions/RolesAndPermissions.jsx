@@ -22,6 +22,7 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
 import { permissionsAPI } from '../../services/api';
+import { translatePermissionName } from '../../utils/permissionLabels';
 import './RolesAndPermissions.css';
 
 const RolesAndPermissions = () => {
@@ -287,7 +288,7 @@ const RolesAndPermissions = () => {
                                                 />
                                                 <span className="checkmark"><Check size={12} /></span>
                                             </div>
-                                            <span className="perm-name">{perm.name}</span>
+                                            <span className="perm-name">{translatePermissionName(perm.name, t)}</span>
                                         </label>
                                     ))}
                                 </div>

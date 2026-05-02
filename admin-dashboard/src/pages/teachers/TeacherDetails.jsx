@@ -8,6 +8,7 @@ import Input from '../../components/common/Input';
 import { teachersAPI, permissionsAPI } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { formatDateTime } from '../../utils/date';
+import { translatePermissionName } from '../../utils/permissionLabels';
 import '../students/StudentDetails.css';
 import '../permissions/RolesAndPermissions.css';
 
@@ -450,7 +451,7 @@ const TeacherDetails = () => {
                               <Check size={12} />
                             </span>
                           </div>
-                          <span className="perm-name">{perm.name}</span>
+                          <span className="perm-name">{translatePermissionName(perm.name, t)}</span>
                         </label>
                       ))}
                     </div>
