@@ -206,6 +206,47 @@ export const videosAPI = {
   delete: (lessonId) => api.delete(`/admin/videos/${lessonId}`),
 };
 
+/**
+ * فيديوهات الأستاذ (نفس عقود الرفع المجزأ كالأدمن؛ المسار /api/instructor/videos/*).
+ * يُستخدم مع توكن الأستاذ (Bearer في localStorage أو عميل منفصل).
+ */
+export const instructorVideosAPI = {
+  upload: (formData, onUploadProgress) =>
+    api.post('/instructor/videos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress,
+    }),
+  getChunkUploadStatus: (params) => api.get('/instructor/videos/chunk/status', { params }),
+  abandonChunkUpload: (params) =>
+    api.delete('/instructor/videos/chunk/session', { params }),
+  uploadChunk: (formData, onUploadProgress, signal) =>
+    api.post('/instructor/videos/chunk', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress,
+      signal,
+    }),
+  completeChunkUpload: (formData, onUploadProgress) =>
+    api.post('/instructor/videos/chunk/complete', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress,
+    }),
+  update: (lessonId, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return api.post(`/instructor/videos/${lessonId}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/instructor/videos/${lessonId}`, data);
+  },
+  delete: (lessonId) => api.delete(`/instructor/videos/${lessonId}`),
+  makeFirstFree: (courseId) =>
+    api.post(`/instructor/courses/${courseId}/make-first-free`),
+};
+
 // Academic structure (departments / years / semesters / subjects)
 export const academicAPI = {
   getDepartments: (params) => api.get('/admin/departments', { params }),

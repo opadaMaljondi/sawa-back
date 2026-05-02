@@ -419,7 +419,7 @@ class VideoController extends Controller
                 @unlink($fullTempPath);
 
                 return response()->json([
-                    'message' => "Missing chunk {$i} of {$total}.",
+                    'message' => "Missing chunk {$i} of {$total}. Re-upload all parts in order.",
                 ], 422);
             }
             $in = fopen($part, 'rb');

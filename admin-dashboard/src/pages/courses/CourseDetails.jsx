@@ -532,14 +532,14 @@ const CourseDetails = () => {
     }
   };
 
-  const toggleChunkPause = () => {
-    if (chunkPauseRef.current) {
-      chunkPauseRef.current = false;
-      setChunkPausedUi(false);
-    } else {
-      chunkPauseRef.current = true;
-      setChunkPausedUi(true);
-    }
+  const handleChunkPause = () => {
+    chunkPauseRef.current = true;
+    setChunkPausedUi(true);
+  };
+
+  const handleChunkResume = () => {
+    chunkPauseRef.current = false;
+    setChunkPausedUi(false);
   };
 
   const handleCancelChunkUploadInFlight = () => {
@@ -1672,29 +1672,71 @@ const CourseDetails = () => {
 
           {lessonLoading &&
             lessonFile &&
-            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') &&
-            lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <Button type="button" variant="outline" size="sm" onClick={toggleChunkPause}>
-                  {chunkPausedUi ? 'استئناف' : 'إيقاف مؤقت'}
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleCancelChunkUploadInFlight}>
-                  إلغاء الرفع
-                </Button>
+            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') && (
+              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-3">
+                {lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={chunkPausedUi}
+                      onClick={handleChunkPause}
+                    >
+                      إيقاف
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      disabled={!chunkPausedUi}
+                      onClick={handleChunkResume}
+                    >
+                      استئناف
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={handleCancelChunkUploadInFlight}>
+                      إلغاء الرفع
+                    </Button>
+                    {chunkPausedUi && (
+                      <span className="text-sm text-amber-700 dark:text-amber-400 mr-auto">
+                        الرفع متوقف مؤقتاً — اضغط استئناف للمتابعة
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 13,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span>{chunkPartLabel || 'جاري الرفع...'}</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div
+                    style={{
+                      background: '#e5e7eb',
+                      borderRadius: 6,
+                      height: 8,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: '#3b82f6',
+                        width: `${uploadProgress}%`,
+                        height: '100%',
+                        transition: 'width 0.3s',
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
-
-          {lessonLoading && (uploadProgress > 0 || chunkPartLabel) && (
-            <div style={{ margin: '8px 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <span>{chunkPartLabel || 'جاري الرفع...'}</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#3b82f6', width: `${uploadProgress}%`, height: '100%', transition: 'width 0.3s' }} />
-              </div>
-            </div>
-          )}
           <div className="modal-form-actions">
             <Button type="submit" variant="primary" loading={lessonLoading}>
               حفظ ورفع

@@ -3145,6 +3145,82 @@
               "response": []
             },
             {
+              "name": "Chunk upload status (resume)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{instructor_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/instructor/videos/chunk/status?upload_id=550e8400-e29b-41d4-a716-446655440000&total_chunks=3",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "instructor",
+                    "videos",
+                    "chunk",
+                    "status"
+                  ],
+                  "query": [
+                    {
+                      "key": "upload_id",
+                      "value": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    {
+                      "key": "total_chunks",
+                      "value": "3"
+                    }
+                  ]
+                },
+                "description": "next_chunk_index، chunks_on_disk، all_chunks_received — للاستئناف بعد انقطاع الشبكة."
+              },
+              "response": []
+            },
+            {
+              "name": "Abandon chunk session",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{instructor_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/instructor/videos/chunk/session?upload_id=550e8400-e29b-41d4-a716-446655440000",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "instructor",
+                    "videos",
+                    "chunk",
+                    "session"
+                  ],
+                  "query": [
+                    {
+                      "key": "upload_id",
+                      "value": "550e8400-e29b-41d4-a716-446655440000"
+                    }
+                  ]
+                },
+                "description": "حذف الأجزاء المؤقتة على السيرفر عند إلغاء الرفع."
+              },
+              "response": []
+            },
+            {
               "name": "Upload Video Chunk",
               "request": {
                 "method": "POST",
