@@ -353,10 +353,19 @@ class VideoController extends Controller
             'approval_status', 'video_provider',
         ]);
 
-        $data['is_free'] = $request->boolean('is_free');
-        $data['can_download'] = $request->boolean('can_download');
-        $data['can_purchase_alone'] = $request->boolean('can_purchase_alone');
-        $data['active'] = $request->boolean('active');
+        // لا تُعاد كتابة الحقول المنطقية إن لم تُرسل؛ وإلا boolean() يعيد false للمفقود ويُصفّر can_download عند «نشر» جزئي.
+        if ($request->exists('is_free')) {
+            $data['is_free'] = $request->boolean('is_free');
+        }
+        if ($request->exists('can_download')) {
+            $data['can_download'] = $request->boolean('can_download');
+        }
+        if ($request->exists('can_purchase_alone')) {
+            $data['can_purchase_alone'] = $request->boolean('can_purchase_alone');
+        }
+        if ($request->exists('active')) {
+            $data['active'] = $request->boolean('active');
+        }
 
         if ($request->has('youtube_url')) {
             $data['video_provider'] = 'youtube';
