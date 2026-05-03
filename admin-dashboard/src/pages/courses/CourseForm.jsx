@@ -256,9 +256,15 @@ const CourseForm = () => {
                 checked={form.allow_lesson_purchase}
                 onChange={handleChange('allow_lesson_purchase')}
               />
-              <label htmlFor="allow_lesson_purchase" className="text-sm">السماح بشراء الدروس منفردة</label>
+              <label htmlFor="allow_lesson_purchase" className="text-sm">
+                السماح بشراء الدروس (الفيديوهات) منفردة
+              </label>
             </div>
           </div>
+          <p className="text-xs text-gray-500 -mt-1">
+            عند تفعيل «شراء الدروس منفردة» على الكورس، تكون القيمة الافتراضية لمربع «شراء منفرد» عند إضافة فيديو
+            جديد مطابقة لهذا الإعداد؛ ويمكن تغيير كل درس لاحقاً من شاشة تفاصيل الكورس.
+          </p>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2 space-y-3">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-200">

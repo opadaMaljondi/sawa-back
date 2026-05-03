@@ -1669,6 +1669,11 @@ const CourseDetails = () => {
                     <span className="text-sm">شراء منفرد</span>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  إعداد الكورس «شراء الدروس منفردة»:{' '}
+                  {course.allow_lesson_purchase ? 'مفعّل' : 'غير مفعّل'} — يُعرض هنا كافتراضي عند فتح هذه
+                  النافذة؛ غيّر المربع أعلاه إذا أردت استثناء هذا الدرس فقط.
+                </p>
 
           {lessonLoading &&
             lessonFile &&
