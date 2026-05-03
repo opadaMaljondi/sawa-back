@@ -88,6 +88,14 @@ class Course extends Model
         return (int) $this->students_count;
     }
 
+    /**
+     * Default for new lessons when the API client omits can_purchase_alone (matches «شراء دروس منفردة» on the course).
+     */
+    public function defaultLessonCanPurchaseAlone(): bool
+    {
+        return (bool) $this->allow_lesson_purchase;
+    }
+
     /** الكورسات الظاهرة للطالب (موافق عليها من الأدمن). */
     public function scopeApprovedForStudents($query)
     {

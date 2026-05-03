@@ -331,7 +331,7 @@ const CourseDetails = () => {
       video_provider: 'youtube',
       video_url: '',
       can_download: true,
-      can_purchase_alone: false
+      can_purchase_alone: !!course.allow_lesson_purchase
     });
     setLessonFile(null);
     setLessonThumbnail(null);

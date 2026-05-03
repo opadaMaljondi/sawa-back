@@ -132,7 +132,7 @@ class VideoController extends Controller
             'video_reference' => $videoReference,
             'is_free' => $isFree,
             'can_download' => $request->boolean('can_download', true),
-            'can_purchase_alone' => $request->boolean('can_purchase_alone', false),
+            'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
             'active' => false,
             'order' => (int) ($request->order ?? 1),
         ]);
@@ -488,7 +488,7 @@ class VideoController extends Controller
             'video_reference' => $videoReference,
             'is_free' => $isFree,
             'can_download' => $request->boolean('can_download', true),
-            'can_purchase_alone' => $request->boolean('can_purchase_alone', false),
+            'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
             'active' => false,
             'order' => (int) ($request->order ?? 1),
         ]);
@@ -550,6 +550,15 @@ class VideoController extends Controller
         }
 
         return null;
+    }
+
+    private function resolvedCanPurchaseAlone(Request $request, Course $course): bool
+    {
+        if ($request->has('can_purchase_alone')) {
+            return $request->boolean('can_purchase_alone');
+        }
+
+        return $course->defaultLessonCanPurchaseAlone();
     }
 
     private function normalizedLessonDescription(Request $request): ?string
