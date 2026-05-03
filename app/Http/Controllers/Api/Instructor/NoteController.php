@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Note;
 use App\Models\Course;
+use App\Support\FullCourseContentNotifier;
 use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -74,16 +75,13 @@ class NoteController extends Controller
             'is_free' => $isFree,
             'prevent_download' => $request->boolean('prevent_download'),
             'uploaded_by' => auth()->id(),
-            'active' => false, // يحتاج موافقة الأدمن
+            'active' => true,
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تمت إضافة مرفق / ملاحظة جديدة تنتظر المراجعة', null, [
-            'type' => 'instructor_note_created',
-            'note_id' => $note->id,
-        ]);
+        FullCourseContentNotifier::notePublished($note->fresh());
 
         return response()->json([
-            'message' => 'Note created successfully. Waiting for admin approval.',
+            'message' => 'Note created successfully.',
             'note' => $note,
         ], 201);
     }

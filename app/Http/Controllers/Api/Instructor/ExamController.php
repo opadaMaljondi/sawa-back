@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Support\FullCourseContentNotifier;
 use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -52,17 +53,14 @@ class ExamController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'attachment' => $path,
-            'active' => false,
+            'active' => true,
             'created_by' => auth()->id(),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تمت إضافة امتحان جديد يحتاج مراجعة', null, [
-            'type' => 'instructor_exam_created',
-            'exam_id' => $exam->id,
-        ]);
+        FullCourseContentNotifier::examPublished($exam->fresh());
 
         return response()->json([
-            'message' => 'Exam created successfully. Waiting for admin approval.',
+            'message' => 'Exam created successfully.',
             'exam' => $exam,
         ], 201);
     }
