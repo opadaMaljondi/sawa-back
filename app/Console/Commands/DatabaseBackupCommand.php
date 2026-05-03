@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Services\GoogleDriveBackupService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 class DatabaseBackupCommand extends Command
@@ -52,6 +54,19 @@ class DatabaseBackupCommand extends Command
 
         $this->pruneOldBackups($dir, $keep);
         $this->info("تم إنشاء النسخة: {$sqlPath}");
+
+        $driveUploader = app(GoogleDriveBackupService::class);
+        if ($driveUploader->isConfigured()) {
+            try {
+                $driveUploader->uploadAndMaintainRetention($sqlPath);
+                $this->info('تم الرفع إلى Google Drive.');
+            } catch (\Throwable $e) {
+                Log::warning('database:backup Google Drive upload failed: '.$e->getMessage(), [
+                    'path' => $sqlPath,
+                ]);
+                $this->warn('تعذّر الرفع إلى Google Drive: '.$e->getMessage());
+            }
+        }
 
         return self::SUCCESS;
     }

@@ -15,6 +15,7 @@ auth.json
 public/firebase.json
 storage/app/firebase-credentials.json
 storage/app/youtube-token.json
+storage/app/google-drive-service-account.json
 npm-debug.log
 yarn-error.log
 /.fleet
