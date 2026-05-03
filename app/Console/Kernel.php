@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('courses:deactivate-expired-enrollments')->dailyAt('06:00');
+        $schedule->command('database:backup')->dailyAt('02:15')->withoutOverlapping(120);
     }
 
     /**
