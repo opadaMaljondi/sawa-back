@@ -16,9 +16,24 @@ class GoogleDriveBackupService
         }
 
         $folderId = trim((string) config('backup.google_drive.folder_id'));
-        $path = (string) config('backup.google_drive.credentials_path');
+        if ($folderId === '') {
+            return false;
+        }
 
-        return $folderId !== '' && $path !== '' && is_readable($path);
+        $auth = strtolower((string) config('backup.google_drive.auth', 'oauth'));
+
+        if ($auth === 'service_account') {
+            $path = (string) config('backup.google_drive.credentials_path');
+
+            return $path !== '' && is_readable($path);
+        }
+
+        $tokenPath = (string) config('backup.google_drive.oauth_token_path');
+
+        return $tokenPath !== ''
+            && is_readable($tokenPath)
+            && filled(config('youtube.client_id'))
+            && filled(config('youtube.client_secret'));
     }
 
     /**
@@ -32,15 +47,11 @@ class GoogleDriveBackupService
             throw new \RuntimeException('ملف النسخ الاحتياطي غير موجود للرفع.');
         }
 
-        $credentialsPath = (string) config('backup.google_drive.credentials_path');
         $folderId = trim((string) config('backup.google_drive.folder_id'));
         $keep = max(1, (int) config('backup.google_drive.keep_files', 3));
         $supportsAllDrives = (bool) config('backup.google_drive.supports_all_drives', false);
 
-        $client = new GoogleClient;
-        $client->setAuthConfig($credentialsPath);
-        $client->setScopes([Drive::DRIVE]);
-
+        $client = $this->buildGoogleClient();
         $drive = new Drive($client);
 
         $fileName = basename($absoluteSqlPath);
@@ -58,6 +69,56 @@ class GoogleDriveBackupService
         ]);
 
         $this->pruneRemoteBackups($drive, $folderId, $keep, $supportsAllDrives);
+    }
+
+    private function buildGoogleClient(): GoogleClient
+    {
+        $auth = strtolower((string) config('backup.google_drive.auth', 'oauth'));
+
+        if ($auth === 'service_account') {
+            $credentialsPath = (string) config('backup.google_drive.credentials_path');
+            $client = new GoogleClient;
+            $client->setAuthConfig($credentialsPath);
+            $client->setScopes([Drive::DRIVE]);
+
+            return $client;
+        }
+
+        return $this->buildOAuthClientFromYouTubeToken();
+    }
+
+    private function buildOAuthClientFromYouTubeToken(): GoogleClient
+    {
+        $tokenPath = (string) config('backup.google_drive.oauth_token_path');
+        if (! is_readable($tokenPath)) {
+            throw new \RuntimeException('ملف OAuth غير موجود أو غير قابل للقراءة: '.$tokenPath);
+        }
+
+        $client = new GoogleClient;
+        $client->setClientId((string) config('youtube.client_id'));
+        $client->setClientSecret((string) config('youtube.client_secret'));
+        $client->setRedirectUri((string) config('youtube.redirect_uri'));
+        $client->setScopes(config('youtube.scopes'));
+        $client->setAccessType('offline');
+        $client->setPrompt('consent');
+
+        $previousToken = json_decode((string) file_get_contents($tokenPath), true);
+        if (! is_array($previousToken)) {
+            throw new \RuntimeException('ملف التوكن غير صالح (JSON).');
+        }
+
+        $client->setAccessToken($previousToken);
+
+        if ($client->isAccessTokenExpired()) {
+            $refresh = $client->getRefreshToken();
+            if (! $refresh) {
+                throw new \RuntimeException('انتهت صلاحية التوكن ولا يوجد refresh_token. أعد التفويض من: '.YouTubeService::oauthAuthorizeUrl());
+            }
+            $client->fetchAccessTokenWithRefreshToken($refresh);
+            YouTubeService::persistAccessToken($tokenPath, $client, $previousToken);
+        }
+
+        return $client;
     }
 
     private function pruneRemoteBackups(Drive $drive, string $folderId, int $keep, bool $supportsAllDrives): void

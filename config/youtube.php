@@ -11,6 +11,8 @@ return [
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube.readonly',
         'https://www.googleapis.com/auth/youtube.force-ssl',
+        /** رفع النسخ الاحتياطية إلى Drive بنفس OAuth — أعد فتح /youtube/auth بعد إضافة النطاق */
+        'https://www.googleapis.com/auth/drive.file',
     ],
 
     'upload_settings' => [

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\YouTubeService;
 use Google\Client as GoogleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -42,6 +43,8 @@ class YouTubeAuthController extends Controller
         $client->setClientId(config('youtube.client_id'));
         $client->setClientSecret(config('youtube.client_secret'));
         $client->setRedirectUri(config('youtube.redirect_uri'));
+        $client->setScopes(config('youtube.scopes'));
+        $client->setAccessType('offline');
 
         try {
             $token = $client->fetchAccessTokenWithAuthCode($request->code);
@@ -55,10 +58,11 @@ class YouTubeAuthController extends Controller
 
             $path = storage_path('app/youtube-token.json');
             $dir = dirname($path);
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 mkdir($dir, 0755, true);
             }
-            file_put_contents($path, json_encode($token));
+            $client->setAccessToken($token);
+            YouTubeService::persistAccessToken($path, $client, null);
 
             return response()->view('youtube-auth-success');
         } catch (\Throwable $e) {
