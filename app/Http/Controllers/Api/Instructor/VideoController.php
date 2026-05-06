@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
+use App\Support\FullCourseContentNotifier;
 use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -120,6 +121,8 @@ class VideoController extends Controller
 
         $isFree = $request->boolean('is_free', false);
 
+        $publishInstantly = $this->instructorMayPublishLessonInstantly();
+
         $lesson = Lesson::create([
             'course_id' => $course->id,
             'section_id' => $request->section_id,
@@ -133,16 +136,32 @@ class VideoController extends Controller
             'is_free' => $isFree,
             'can_download' => $request->boolean('can_download', true),
             'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
-            'active' => false,
+            'approval_status' => $publishInstantly ? 'approved' : 'pending',
+            'active' => $publishInstantly,
             'order' => (int) ($request->order ?? 1),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تم رفع درس فيديو جديد يحتاج مراجعة', null, [
-            'type' => 'instructor_lesson_pending',
-            'lesson_id' => $lesson->id,
-        ]);
+        if ($publishInstantly) {
+            FullCourseContentNotifier::lessonPublished($lesson->fresh());
+            InstructorAdminNotifier::notify(
+                $course,
+                'تم نشر درس فيديو جديد فوراً (لا يوجد انتظار موافقة إدارية)',
+                'إطلاع أمني: درس تم نشره',
+                [
+                    'type' => 'instructor_lesson_auto_published',
+                    'lesson_id' => $lesson->id,
+                ]
+            );
+        } else {
+            InstructorAdminNotifier::notify($course, 'تم رفع درس فيديو جديد يحتاج مراجعة', null, [
+                'type' => 'instructor_lesson_pending',
+                'lesson_id' => $lesson->id,
+            ]);
+        }
 
-        if ($videoProvider === 'youtube') {
+        if ($publishInstantly) {
+            $message = 'Video uploaded and published successfully.';
+        } elseif ($videoProvider === 'youtube') {
             $message = 'Video uploaded successfully. Waiting for admin approval.';
         } elseif ($videoProvider === 'aws') {
             $message = 'Video uploaded to S3. Waiting for admin approval.';
@@ -476,6 +495,8 @@ class VideoController extends Controller
 
         $isFree = $request->boolean('is_free', false);
 
+        $publishInstantly = $this->instructorMayPublishLessonInstantly();
+
         $lesson = Lesson::create([
             'course_id' => $course->id,
             'section_id' => $request->section_id,
@@ -489,17 +510,31 @@ class VideoController extends Controller
             'is_free' => $isFree,
             'can_download' => $request->boolean('can_download', true),
             'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
-            'active' => false,
+            'approval_status' => $publishInstantly ? 'approved' : 'pending',
+            'active' => $publishInstantly,
             'order' => (int) ($request->order ?? 1),
         ]);
 
-        InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة', null, [
-            'type' => 'instructor_lesson_pending',
-            'lesson_id' => $lesson->id,
-        ]);
+        if ($publishInstantly) {
+            FullCourseContentNotifier::lessonPublished($lesson->fresh());
+            InstructorAdminNotifier::notify(
+                $course,
+                'تم نشر درس فيديو (رفع جزئي) فوراً (لا يوجد انتظار موافقة إدارية)',
+                'إطلاع أمني: درس تم نشره',
+                [
+                    'type' => 'instructor_lesson_auto_published',
+                    'lesson_id' => $lesson->id,
+                ]
+            );
+        } else {
+            InstructorAdminNotifier::notify($course, 'تم رفع درس (جزئي) يحتاج مراجعة', null, [
+                'type' => 'instructor_lesson_pending',
+                'lesson_id' => $lesson->id,
+            ]);
+        }
 
         return response()->json([
-            'message' => $message,
+            'message' => $publishInstantly ? 'Video uploaded and published successfully.' : $message,
             'lesson' => $lesson->fresh(),
             'video_provider' => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
@@ -572,6 +607,13 @@ class VideoController extends Controller
         }
 
         return is_string($d) ? $d : (string) $d;
+    }
+
+    private function instructorMayPublishLessonInstantly(): bool
+    {
+        $user = auth()->user();
+
+        return $user && $user->hasPermissionTo('publish video instantly');
     }
 
     private function resolvedLessonPrice(Request $request, bool $isFree): ?float

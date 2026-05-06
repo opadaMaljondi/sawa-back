@@ -321,6 +321,7 @@
             "create_video": "إنشاء فيديو",
             "edit_video": "تعديل فيديو",
             "delete_video": "حذف فيديو",
+            "publish_video_instantly": "نشر فيديو فوري (بدون موافقة الإدارة)",
             "publish_note": "نشر ملاحظة",
             "edit_note": "تعديل ملاحظة",
             "delete_note": "حذف ملاحظة",

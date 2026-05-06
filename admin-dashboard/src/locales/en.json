@@ -321,6 +321,7 @@
             "create_video": "Create video",
             "edit_video": "Edit video",
             "delete_video": "Delete video",
+            "publish_video_instantly": "Instant video publish (no admin approval)",
             "publish_note": "Publish note",
             "edit_note": "Edit note",
             "delete_note": "Delete note",

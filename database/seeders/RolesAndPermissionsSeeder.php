@@ -26,6 +26,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'create video',
             'edit video',
             'delete video',
+            // نشر فيديوهات دون انتظار موافقة الإدارة (إشعار إطلاع للأدمن فقط)
+            'publish video instantly',
             // ملاحظات
             'publish note',
             'edit note',
