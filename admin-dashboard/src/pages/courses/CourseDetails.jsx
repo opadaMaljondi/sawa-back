@@ -13,8 +13,13 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 const VIDEO_CHUNK_BYTES = 15 * 1024 * 1024;
 /** Use multipart chunks for local/aws files at or above this size. */
 const VIDEO_CHUNK_THRESHOLD = 15 * 1024 * 1024;
-/** Parallel chunk PUTs (same session; distinct chunk_index per request). */
-const VIDEO_CHUNK_PARALLEL = 5;
+/** Parallel chunk PUTs (Chrome ~6 connections/host on HTTP/1.1; leave margin for other API calls). */
+const VIDEO_CHUNK_PARALLEL = 6;
+
+function chunkByteLength(fileSize, index) {
+  const start = index * VIDEO_CHUNK_BYTES;
+  return Math.min(VIDEO_CHUNK_BYTES, Math.max(0, fileSize - start));
+}
 
 function chunkUploadStorageKey(courseId, file) {
   if (!file || !courseId) return '';
@@ -32,7 +37,7 @@ async function uploadChunkWithRetry(videosApi, formData, onUploadProgress, signa
       return;
     } catch (err) {
       if (attempt === retries - 1) throw err;
-      await sleepMs(1000 * (attempt + 1));
+      await sleepMs(400 * (attempt + 1));
     }
   }
 }
@@ -450,9 +455,15 @@ const CourseDetails = () => {
         }
 
         chunkUploadIdRef.current = uploadId;
-        const doneInitial = received.size;
+
+        let initialUploadedBytes = 0;
+        for (const idx of received) {
+          initialUploadedBytes += chunkByteLength(lessonFile.size, idx);
+        }
         setUploadProgress(
-          totalChunks > 0 ? Math.min(99, Math.round((doneInitial / totalChunks) * 100)) : 0,
+          lessonFile.size > 0
+            ? Math.min(99, Math.round((initialUploadedBytes / lessonFile.size) * 100))
+            : 0,
         );
 
         const pendingIndices = [];
@@ -462,6 +473,24 @@ const CourseDetails = () => {
 
         const poolAc = new AbortController();
         chunkFlightAbortRef.current = poolAc;
+
+        const inflightLoaded = {};
+        let recomputeTimer = null;
+        const scheduleProgressRecompute = () => {
+          if (recomputeTimer != null) return;
+          recomputeTimer = setTimeout(() => {
+            recomputeTimer = null;
+            let bytes = initialUploadedBytes;
+            for (const idx of pendingIndices) {
+              const cap = chunkByteLength(lessonFile.size, idx);
+              bytes += Math.min(cap, inflightLoaded[idx] ?? 0);
+            }
+            const pct =
+              lessonFile.size > 0 ? Math.min(99, Math.round((bytes / lessonFile.size) * 100)) : 0;
+            setUploadProgress(pct);
+            setChunkPartLabel(`جاري الرفع… ${pct}%`);
+          }, 120);
+        };
 
         const tasks = pendingIndices.map((i) => {
           const sliceStart = i * VIDEO_CHUNK_BYTES;
@@ -475,16 +504,31 @@ const CourseDetails = () => {
           return {
             index: i,
             formData: chunkFd,
-            onUploadProgress: undefined,
+            onUploadProgress: (ev) => {
+              if (ev.total) {
+                inflightLoaded[i] = ev.loaded;
+                scheduleProgressRecompute();
+              }
+            },
           };
         });
 
-        let done = doneInitial;
         const bumpAfterPart = (chunkIndex) => {
           received.add(chunkIndex);
-          done = received.size;
-          setUploadProgress(Math.min(99, Math.round((done / totalChunks) * 100)));
-          setChunkPartLabel(`جاري الرفع… ${done}/${totalChunks}`);
+          inflightLoaded[chunkIndex] = chunkByteLength(lessonFile.size, chunkIndex);
+          const doneCount = received.size;
+          if (lessonFile.size > 0) {
+            let bytes = initialUploadedBytes;
+            for (const idx of pendingIndices) {
+              const cap = chunkByteLength(lessonFile.size, idx);
+              bytes += Math.min(cap, inflightLoaded[idx] ?? 0);
+            }
+            setUploadProgress(Math.min(99, Math.round((bytes / lessonFile.size) * 100)));
+            setChunkPartLabel(`جاري الرفع… ${doneCount}/${totalChunks}`);
+          } else {
+            setUploadProgress(Math.min(99, Math.round((doneCount / totalChunks) * 100)));
+            setChunkPartLabel(`جاري الرفع… ${doneCount}/${totalChunks}`);
+          }
           try {
             localStorage.setItem(
               lsKey,
@@ -523,6 +567,11 @@ const CourseDetails = () => {
             }
             throw err;
           }
+        }
+
+        if (recomputeTimer != null) {
+          clearTimeout(recomputeTimer);
+          recomputeTimer = null;
         }
 
         if (chunkAbortRef.current) {
