@@ -9,14 +9,60 @@ import Modal from '../../components/common/Modal';
 import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
-/** Chunk size (bytes); each request should stay under PHP post_max_filesize. */
-const VIDEO_CHUNK_BYTES = 4 * 1024 * 1024;
-/** Local/aws files larger than this use chunked upload. */
-const VIDEO_CHUNK_THRESHOLD = 4 * 1024 * 1024;
+/** Chunk size (bytes); align with server VIDEO_CHUNK_MAX_KB / PHP post limits. */
+const VIDEO_CHUNK_BYTES = 15 * 1024 * 1024;
+/** Use multipart chunks for local/aws files at or above this size. */
+const VIDEO_CHUNK_THRESHOLD = 15 * 1024 * 1024;
+/** Parallel chunk PUTs (same session; distinct chunk_index per request). */
+const VIDEO_CHUNK_PARALLEL = 5;
 
 function chunkUploadStorageKey(courseId, file) {
   if (!file || !courseId) return '';
   return `sawa_video_chunk:${courseId}:${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function sleepMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function uploadChunkWithRetry(videosApi, formData, onUploadProgress, signal, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    try {
+      await videosApi.uploadChunk(formData, onUploadProgress, signal);
+      return;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await sleepMs(1000 * (attempt + 1));
+    }
+  }
+}
+
+async function runChunkUploadPool(
+  videosApi,
+  tasks,
+  concurrency,
+  signal,
+  onTaskDone,
+  waitWhilePaused,
+  isAbortRequested,
+) {
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      await waitWhilePaused();
+      if (signal.aborted || isAbortRequested()) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      if (cursor >= tasks.length) return;
+      const i = cursor;
+      cursor += 1;
+      const task = tasks[i];
+      await uploadChunkWithRetry(videosApi, task.formData, task.onUploadProgress, signal);
+      onTaskDone(task.index);
+    }
+  }
+  const n = Math.min(Math.max(1, concurrency), Math.max(1, tasks.length));
+  await Promise.all(Array.from({ length: n }, () => worker()));
 }
 
 const CourseDetails = () => {
@@ -378,7 +424,7 @@ const CourseDetails = () => {
         const lsKey = chunkUploadStorageKey(course.id, lessonFile);
 
         let uploadId = crypto.randomUUID();
-        let startIndex = 0;
+        const received = new Set();
         try {
           const raw = localStorage.getItem(lsKey);
           if (raw) {
@@ -389,7 +435,14 @@ const CourseDetails = () => {
                 total_chunks: totalChunks,
               });
               uploadId = saved.uploadId;
-              startIndex = Number(st.next_chunk_index) || 0;
+              if (Array.isArray(st.received_chunk_indices) && st.received_chunk_indices.length > 0) {
+                st.received_chunk_indices.forEach((idx) => received.add(Number(idx)));
+              } else {
+                const next = Number(st.next_chunk_index) || 0;
+                for (let j = 0; j < next && j < totalChunks; j += 1) {
+                  received.add(j);
+                }
+              }
             }
           }
         } catch {
@@ -397,21 +450,20 @@ const CourseDetails = () => {
         }
 
         chunkUploadIdRef.current = uploadId;
-        setUploadProgress(Math.min(99, Math.round((startIndex / totalChunks) * 100)));
+        const doneInitial = received.size;
+        setUploadProgress(
+          totalChunks > 0 ? Math.min(99, Math.round((doneInitial / totalChunks) * 100)) : 0,
+        );
 
-        for (let i = startIndex; i < totalChunks; i += 1) {
-          await waitWhilePaused();
-          if (chunkAbortRef.current) {
-            try {
-              await videosAPI.abandonChunkUpload({ upload_id: uploadId });
-            } catch {
-              /* ignore */
-            }
-            localStorage.removeItem(lsKey);
-            throw new Error('UPLOAD_CANCELLED');
-          }
+        const pendingIndices = [];
+        for (let i = 0; i < totalChunks; i += 1) {
+          if (!received.has(i)) pendingIndices.push(i);
+        }
 
-          setChunkPartLabel(`الجزء ${i + 1} من ${totalChunks}`);
+        const poolAc = new AbortController();
+        chunkFlightAbortRef.current = poolAc;
+
+        const tasks = pendingIndices.map((i) => {
           const sliceStart = i * VIDEO_CHUNK_BYTES;
           const blob = lessonFile.slice(sliceStart, sliceStart + VIDEO_CHUNK_BYTES);
           const chunkFd = new FormData();
@@ -420,17 +472,45 @@ const CourseDetails = () => {
           chunkFd.append('total_chunks', String(totalChunks));
           chunkFd.append('original_name', lessonFile.name);
           chunkFd.append('chunk', blob, lessonFile.name);
+          return {
+            index: i,
+            formData: chunkFd,
+            onUploadProgress: undefined,
+          };
+        });
 
-          const ac = new AbortController();
-          chunkFlightAbortRef.current = ac;
-
+        let done = doneInitial;
+        const bumpAfterPart = (chunkIndex) => {
+          received.add(chunkIndex);
+          done = received.size;
+          setUploadProgress(Math.min(99, Math.round((done / totalChunks) * 100)));
+          setChunkPartLabel(`جاري الرفع… ${done}/${totalChunks}`);
           try {
-            await videosAPI.uploadChunk(chunkFd, (ev) => {
-              if (ev.total) {
-                const part = (i + ev.loaded / ev.total) / totalChunks;
-                setUploadProgress(Math.min(99, Math.round(part * 100)));
-              }
-            }, ac.signal);
+            localStorage.setItem(
+              lsKey,
+              JSON.stringify({
+                uploadId,
+                totalChunks,
+                courseId: course.id,
+                lastChunk: chunkIndex,
+              }),
+            );
+          } catch {
+            /* ignore quota */
+          }
+        };
+
+        if (tasks.length > 0) {
+          try {
+            await runChunkUploadPool(
+              videosAPI,
+              tasks,
+              VIDEO_CHUNK_PARALLEL,
+              poolAc.signal,
+              bumpAfterPart,
+              waitWhilePaused,
+              () => chunkAbortRef.current,
+            );
           } catch (err) {
             if (isAbortLikeError(err) && chunkAbortRef.current) {
               try {
@@ -443,20 +523,16 @@ const CourseDetails = () => {
             }
             throw err;
           }
+        }
 
+        if (chunkAbortRef.current) {
           try {
-            localStorage.setItem(
-              lsKey,
-              JSON.stringify({
-                uploadId,
-                totalChunks,
-                courseId: course.id,
-                lastChunk: i,
-              }),
-            );
+            await videosAPI.abandonChunkUpload({ upload_id: uploadId });
           } catch {
-            /* ignore quota */
+            /* ignore */
           }
+          localStorage.removeItem(lsKey);
+          throw new Error('UPLOAD_CANCELLED');
         }
 
         setChunkPartLabel('إتمام الدمج والحفظ...');
@@ -475,11 +551,35 @@ const CourseDetails = () => {
         fd.append('price', lessonForm.price || 0);
         fd.append('can_download', lessonForm.can_download ? '1' : '0');
         fd.append('can_purchase_alone', lessonForm.can_purchase_alone ? '1' : '0');
+        fd.append('async_merge', '1');
         if (lessonThumbnail) fd.append('thumbnail', lessonThumbnail);
 
-        await videosAPI.completeChunkUpload(fd, (ev) => {
+        const completeRes = await videosAPI.completeChunkUpload(fd, (ev) => {
           if (ev.total) setUploadProgress(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
         });
+
+        if (completeRes.status === 202 && completeRes.data?.merge_token) {
+          const mergeToken = completeRes.data.merge_token;
+          setUploadProgress(95);
+          setChunkPartLabel('جاري دمج الأجزاء على الخادم…');
+          const deadline = Date.now() + 25 * 60 * 1000;
+          let mergeStatus = completeRes.data.status || 'queued';
+          while (Date.now() < deadline) {
+            await sleepMs(1200);
+            const st = await videosAPI.getChunkMergeStatus({ merge_token: mergeToken });
+            mergeStatus = st.data?.status || mergeStatus;
+            if (mergeStatus === 'completed') {
+              setUploadProgress(100);
+              break;
+            }
+            if (mergeStatus === 'failed') {
+              throw new Error(st.data?.message || 'فشل دمج الفيديو');
+            }
+          }
+          if (mergeStatus !== 'completed') {
+            throw new Error('انتهى وقت انتظار دمج الفيديو. تحقق من تشغيل الطابور (queue worker).');
+          }
+        }
 
         localStorage.removeItem(lsKey);
         chunkUploadIdRef.current = null;

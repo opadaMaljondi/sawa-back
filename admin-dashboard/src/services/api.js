@@ -174,8 +174,10 @@ export const videosAPI = {
       timeout: 0, // no timeout for large video uploads
       onUploadProgress,
     }),
-  /** Resume info: next_chunk_index, chunks_on_disk, all_chunks_received */
+  /** Resume: next_chunk_index, received_chunk_indices, all_chunks_received, … */
   getChunkUploadStatus: (params) => api.get('/admin/videos/chunk/status', { params }),
+  /** After async chunk complete: status queued|processing|completed|failed */
+  getChunkMergeStatus: (params) => api.get('/admin/videos/chunk/merge-status', { params }),
   /** Delete partial chunks on server (cancel session). */
   abandonChunkUpload: (params) =>
     api.delete('/admin/videos/chunk/session', { params }),
@@ -218,6 +220,7 @@ export const instructorVideosAPI = {
       onUploadProgress,
     }),
   getChunkUploadStatus: (params) => api.get('/instructor/videos/chunk/status', { params }),
+  getChunkMergeStatus: (params) => api.get('/instructor/videos/chunk/merge-status', { params }),
   abandonChunkUpload: (params) =>
     api.delete('/instructor/videos/chunk/session', { params }),
   uploadChunk: (formData, onUploadProgress, signal) =>

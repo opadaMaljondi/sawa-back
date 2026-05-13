@@ -227,6 +227,7 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
 
     // Videos
     Route::get('videos/chunk/status', [VideoController::class, 'chunkUploadStatus']);
+    Route::get('videos/chunk/merge-status', [VideoController::class, 'chunkMergeStatus']);
     Route::delete('videos/chunk/session', [VideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [VideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [VideoController::class, 'completeChunkUpload']);
@@ -317,6 +318,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Videos (رفع وتعديل وحذف فيديوهات لأي كورس)
     Route::get('videos/chunk/status', [AdminVideoController::class, 'chunkUploadStatus']);
+    Route::get('videos/chunk/merge-status', [AdminVideoController::class, 'chunkMergeStatus']);
     Route::delete('videos/chunk/session', [AdminVideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [AdminVideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [AdminVideoController::class, 'completeChunkUpload']);

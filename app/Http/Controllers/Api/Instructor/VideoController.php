@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Instructor;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\FinalizeChunkedVideoUpload;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
@@ -11,6 +12,7 @@ use App\Support\FullCourseContentNotifier;
 use App\Support\InstructorAdminNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -357,6 +359,38 @@ class VideoController extends Controller
     }
 
     /**
+     * تتبع دمج الأجزاء بعد POST chunk/complete مع async_merge=1.
+     */
+    public function chunkMergeStatus(Request $request): JsonResponse
+    {
+        $request->validate([
+            'merge_token' => 'required|uuid',
+        ]);
+        $token = (string) $request->input('merge_token');
+        $data = Cache::get('video_chunk_merge:'.$token);
+        if (! is_array($data)) {
+            return response()->json(['message' => 'Unknown or expired merge job.'], 404);
+        }
+
+        $out = [
+            'status' => (string) ($data['status'] ?? 'unknown'),
+        ];
+        if (($data['status'] ?? '') === 'completed' && isset($data['lesson_id'])) {
+            $out['lesson'] = Lesson::find((int) $data['lesson_id']);
+            $out['message'] = $data['message'] ?? null;
+            $out['video_provider'] = $data['video_provider'] ?? null;
+            if ($out['lesson']) {
+                $out['video_playback_url'] = $out['lesson']->video_playback_url;
+            }
+        }
+        if (($data['status'] ?? '') === 'failed') {
+            $out['message'] = (string) ($data['error_message'] ?? 'Merge failed.');
+        }
+
+        return response()->json($out);
+    }
+
+    /**
      * إلغاء جلسة الرفع المجزأ وحذف الأجزاء من التخزين المؤقت.
      */
     public function abandonChunkUpload(Request $request)
@@ -365,6 +399,7 @@ class VideoController extends Controller
             'upload_id' => 'required|uuid',
         ]);
         $this->lessonVideoProcessing->deleteChunkDirectory($request->input('upload_id'));
+        Cache::forget('chunk_merge_active:'.$request->input('upload_id'));
 
         return response()->json(['message' => 'تم إلغاء جلسة الرفع وحذف الأجزاء المؤقتة.']);
     }
@@ -424,37 +459,91 @@ class VideoController extends Controller
             return response()->json(['message' => 'Upload session not found. Upload chunks first.'], 422);
         }
 
-        $outName = Str::random(40).'.'.$ext;
-        $tempRelative = 'videos/temp/'.$outName;
-        $fullTempPath = storage_path('app/'.$tempRelative);
-
-        $outHandle = fopen($fullTempPath, 'wb');
-        if ($outHandle === false) {
-            return response()->json(['message' => 'Could not create merged file.'], 500);
+        $chunkState = $this->lessonVideoProcessing->getChunkUploadStatus($uploadId, $total);
+        if (! ($chunkState['all_chunks_received'] ?? false)) {
+            return response()->json([
+                'message' => 'Not all chunks received yet. Upload every part before completing.',
+                'received_chunks_count' => $chunkState['received_chunks_count'] ?? 0,
+                'total_chunks' => $total,
+            ], 422);
         }
 
-        $totalBytes = 0;
-        for ($i = 0; $i < $total; $i++) {
-            $part = $chunkDir.DIRECTORY_SEPARATOR.$i;
-            if (! is_file($part)) {
-                fclose($outHandle);
-                @unlink($fullTempPath);
+        $videoProvider = $request->input('video_provider');
 
-                return response()->json([
-                    'message' => "Missing chunk {$i} of {$total}. Re-upload all parts in order.",
-                ], 422);
-            }
-            $in = fopen($part, 'rb');
-            if ($in === false) {
-                fclose($outHandle);
-                @unlink($fullTempPath);
+        $isFree = $request->boolean('is_free', false);
+        $publishInstantly = $this->instructorMayPublishLessonInstantly();
 
-                return response()->json(['message' => "Could not read chunk {$i}."], 500);
+        if ($request->boolean('async_merge')) {
+            $mapKey = 'chunk_merge_active:'.$uploadId;
+            $existingToken = Cache::get($mapKey);
+            if (is_string($existingToken) && $existingToken !== '') {
+                $prev = Cache::get('video_chunk_merge:'.$existingToken);
+                if (is_array($prev) && in_array($prev['status'] ?? '', ['queued', 'processing', 'completed'], true)) {
+                    return response()->json([
+                        'async' => true,
+                        'merge_token' => $existingToken,
+                        'status' => $prev['status'] ?? 'queued',
+                        'message' => 'Merge already scheduled for this upload session.',
+                    ], 202);
+                }
             }
-            $totalBytes += stream_copy_to_stream($in, $outHandle);
-            fclose($in);
+
+            $mergeToken = (string) Str::uuid();
+            $thumbnailLocal = null;
+            if ($request->hasFile('thumbnail')) {
+                $thumbnailLocal = $request->file('thumbnail')->store('chunk_merge_stage/'.$mergeToken, 'local');
+            }
+
+            $lessonRow = [
+                'course_id' => $course->id,
+                'section_id' => $request->section_id,
+                'title' => $request->title,
+                'description' => $this->normalizedLessonDescription($request),
+                'duration' => (int) $request->duration,
+                'price' => $this->resolvedLessonPrice($request, $isFree),
+                'is_free' => $isFree,
+                'can_download' => $request->boolean('can_download', true),
+                'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
+                'approval_status' => $publishInstantly ? 'approved' : 'pending',
+                'active' => $publishInstantly,
+                'order' => (int) ($request->order ?? 1),
+            ];
+
+            $cachePayload = [
+                'status' => 'queued',
+                'context' => 'instructor',
+                'upload_id' => $uploadId,
+                'total_chunks' => $total,
+                'extension' => $ext,
+                'video_provider' => $videoProvider,
+                'lesson_row' => $lessonRow,
+                'thumbnail_local_relative' => $thumbnailLocal,
+                'thumbnail_public_dir' => 'thumbnails/lessons/course_'.$course->id,
+                'instructor_user_id' => (int) auth()->id(),
+                'publish_instantly' => $publishInstantly,
+            ];
+
+            Cache::put('video_chunk_merge:'.$mergeToken, $cachePayload, now()->addDay());
+            Cache::put($mapKey, $mergeToken, now()->addDay());
+            FinalizeChunkedVideoUpload::dispatch($mergeToken);
+
+            return response()->json([
+                'async' => true,
+                'merge_token' => $mergeToken,
+                'status' => 'queued',
+                'message' => 'جاري دمج الأجزاء ومعالجة الفيديو في الخلفية.',
+            ], 202);
         }
-        fclose($outHandle);
+
+        try {
+            $merged = $this->lessonVideoProcessing->mergeChunkDirectoryToTempFile($uploadId, $total, $ext);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $tempRelative = $merged['relative'];
+        $fullTempPath = $merged['full_path'];
+        $totalBytes = $merged['bytes'];
 
         $maxBytes = $maxTotalKb * 1024;
         if ($totalBytes > $maxBytes) {
@@ -470,8 +559,6 @@ class VideoController extends Controller
 
             return response()->json(['message' => 'Merged file is empty.'], 422);
         }
-
-        $videoProvider = $request->input('video_provider');
 
         try {
             [$videoProvider, $videoReference, $message] = $this->lessonVideoProcessing->processUploadedVideoFile(
@@ -492,10 +579,6 @@ class VideoController extends Controller
         $this->lessonVideoProcessing->deleteChunkDirectory($uploadId);
 
         $thumbnailPath = $this->storeLessonThumbnail($request, $course);
-
-        $isFree = $request->boolean('is_free', false);
-
-        $publishInstantly = $this->instructorMayPublishLessonInstantly();
 
         $lesson = Lesson::create([
             'course_id' => $course->id,
