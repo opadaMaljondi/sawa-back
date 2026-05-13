@@ -615,22 +615,23 @@ const CourseDetails = () => {
           if (ev.total) setUploadProgress(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
         });
 
-        if (completeRes.status === 202 && completeRes.data?.merge_token) {
-          const mergeToken = completeRes.data.merge_token;
+        // الـ interceptor يعيد body فقط (بدون response.status). الدمج غير المتزامن يضع merge_token في الجذر.
+        if (completeRes?.merge_token) {
+          const mergeToken = completeRes.merge_token;
           setUploadProgress(95);
           setChunkPartLabel('جاري دمج الأجزاء على الخادم…');
           const deadline = Date.now() + 25 * 60 * 1000;
-          let mergeStatus = completeRes.data.status || 'queued';
+          let mergeStatus = completeRes.status || 'queued';
           while (Date.now() < deadline) {
             await sleepMs(1200);
             const st = await videosAPI.getChunkMergeStatus({ merge_token: mergeToken });
-            mergeStatus = st.data?.status || mergeStatus;
+            mergeStatus = st?.status || mergeStatus;
             if (mergeStatus === 'completed') {
               setUploadProgress(100);
               break;
             }
             if (mergeStatus === 'failed') {
-              throw new Error(st.data?.message || 'فشل دمج الفيديو');
+              throw new Error(st?.message || 'فشل دمج الفيديو');
             }
           }
           if (mergeStatus !== 'completed') {
