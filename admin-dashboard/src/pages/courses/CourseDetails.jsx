@@ -6,19 +6,15 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
-import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI } from '../../services/api';
+import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI, getVideoUploadChunkBytes } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
-/** Chunk size (bytes); align with server VIDEO_CHUNK_MAX_KB / PHP post limits. */
-const VIDEO_CHUNK_BYTES = 15 * 1024 * 1024;
-/** Use multipart chunks for local/aws files at or above this size. */
-const VIDEO_CHUNK_THRESHOLD = 15 * 1024 * 1024;
-/** Parallel chunk PUTs (Chrome ~6 connections/host on HTTP/1.1; leave margin for other API calls). */
+/** Max parallel chunk uploads (HTTP/1.1 ~6 connections/host). */
 const VIDEO_CHUNK_PARALLEL = 6;
 
-function chunkByteLength(fileSize, index) {
-  const start = index * VIDEO_CHUNK_BYTES;
-  return Math.min(VIDEO_CHUNK_BYTES, Math.max(0, fileSize - start));
+function chunkByteLength(fileSize, index, chunkBytes) {
+  const start = index * chunkBytes;
+  return Math.min(chunkBytes, Math.max(0, fileSize - start));
 }
 
 function chunkUploadStorageKey(courseId, file) {
@@ -105,6 +101,8 @@ const CourseDetails = () => {
   const [lessonError, setLessonError] = useState('');
   const [lessonLoading, setLessonLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  /** حجم جزء الرفع من السيرفر (لعرض تنبيه الواجهة قبل الضغط على حفظ). */
+  const [videoChunkBytesHint, setVideoChunkBytesHint] = useState(32 * 1024 * 1024);
   const [chunkPausedUi, setChunkPausedUi] = useState(false);
   const [chunkPartLabel, setChunkPartLabel] = useState('');
   const chunkPauseRef = useRef(false);
@@ -197,6 +195,17 @@ const CourseDetails = () => {
       course.students_count_display != null ? String(course.students_count_display) : '',
     );
   }, [course]);
+
+  useEffect(() => {
+    if (!course?.id) return;
+    let cancelled = false;
+    getVideoUploadChunkBytes().then((b) => {
+      if (!cancelled) setVideoChunkBytesHint(b);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [course?.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -403,11 +412,6 @@ const CourseDetails = () => {
       return;
     }
 
-    const useChunked =
-      needsUploadOnly &&
-      lessonFile &&
-      lessonFile.size > VIDEO_CHUNK_THRESHOLD;
-
     const waitWhilePaused = async () => {
       while (chunkPauseRef.current && !chunkAbortRef.current) {
         await new Promise((r) => setTimeout(r, 200));
@@ -424,8 +428,12 @@ const CourseDetails = () => {
       chunkAbortRef.current = false;
       setChunkPausedUi(false);
 
+      const videoChunkBytes = await getVideoUploadChunkBytes();
+      const useChunked =
+        needsUploadOnly && lessonFile && lessonFile.size > videoChunkBytes;
+
       if (useChunked) {
-        const totalChunks = Math.ceil(lessonFile.size / VIDEO_CHUNK_BYTES) || 1;
+        const totalChunks = Math.ceil(lessonFile.size / videoChunkBytes) || 1;
         const lsKey = chunkUploadStorageKey(course.id, lessonFile);
 
         let uploadId = crypto.randomUUID();
@@ -458,7 +466,7 @@ const CourseDetails = () => {
 
         let initialUploadedBytes = 0;
         for (const idx of received) {
-          initialUploadedBytes += chunkByteLength(lessonFile.size, idx);
+          initialUploadedBytes += chunkByteLength(lessonFile.size, idx, videoChunkBytes);
         }
         setUploadProgress(
           lessonFile.size > 0
@@ -482,7 +490,7 @@ const CourseDetails = () => {
             recomputeTimer = null;
             let bytes = initialUploadedBytes;
             for (const idx of pendingIndices) {
-              const cap = chunkByteLength(lessonFile.size, idx);
+              const cap = chunkByteLength(lessonFile.size, idx, videoChunkBytes);
               bytes += Math.min(cap, inflightLoaded[idx] ?? 0);
             }
             const pct =
@@ -493,8 +501,8 @@ const CourseDetails = () => {
         };
 
         const tasks = pendingIndices.map((i) => {
-          const sliceStart = i * VIDEO_CHUNK_BYTES;
-          const blob = lessonFile.slice(sliceStart, sliceStart + VIDEO_CHUNK_BYTES);
+          const sliceStart = i * videoChunkBytes;
+          const blob = lessonFile.slice(sliceStart, sliceStart + videoChunkBytes);
           const chunkFd = new FormData();
           chunkFd.append('upload_id', uploadId);
           chunkFd.append('chunk_index', String(i));
@@ -515,12 +523,12 @@ const CourseDetails = () => {
 
         const bumpAfterPart = (chunkIndex) => {
           received.add(chunkIndex);
-          inflightLoaded[chunkIndex] = chunkByteLength(lessonFile.size, chunkIndex);
+          inflightLoaded[chunkIndex] = chunkByteLength(lessonFile.size, chunkIndex, videoChunkBytes);
           const doneCount = received.size;
           if (lessonFile.size > 0) {
             let bytes = initialUploadedBytes;
             for (const idx of pendingIndices) {
-              const cap = chunkByteLength(lessonFile.size, idx);
+              const cap = chunkByteLength(lessonFile.size, idx, videoChunkBytes);
               bytes += Math.min(cap, inflightLoaded[idx] ?? 0);
             }
             setUploadProgress(Math.min(99, Math.round((bytes / lessonFile.size) * 100)));
@@ -1639,7 +1647,7 @@ const CourseDetails = () => {
           {lessonError &&
             lessonFile &&
             (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') &&
-            lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
+            lessonFile.size > videoChunkBytesHint && (
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -1828,7 +1836,7 @@ const CourseDetails = () => {
             lessonFile &&
             (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') && (
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-3">
-                {lessonFile.size > VIDEO_CHUNK_THRESHOLD && (
+                {lessonFile.size > videoChunkBytesHint && (
                   <div className="flex flex-wrap gap-2 items-center">
                     <Button
                       type="button"

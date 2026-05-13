@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Course;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -223,6 +224,18 @@ class LessonVideoProcessingService
             'relative' => $tempRelative,
             'bytes' => $bytes,
         ];
+    }
+
+    /**
+     * حفظ جزء الرفع على القرص (move أسرع من storeAs لأنه يقلل النسخ المؤقتة).
+     */
+    public function storeReceivedChunk(UploadedFile $chunk, string $uploadId, int|string $chunkIndex): void
+    {
+        $chunkDir = storage_path('app/videos/chunks/'.$uploadId);
+        if (! is_dir($chunkDir)) {
+            mkdir($chunkDir, 0755, true);
+        }
+        $chunk->move($chunkDir, (string) $chunkIndex);
     }
 
     public function deleteChunkDirectory(string $uploadId): void

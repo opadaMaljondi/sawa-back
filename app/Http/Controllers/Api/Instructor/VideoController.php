@@ -331,8 +331,11 @@ class VideoController extends Controller
             return response()->json(['message' => 'chunk_index must be less than total_chunks.'], 422);
         }
 
-        $dir = 'videos/chunks/'.$request->upload_id;
-        $request->file('chunk')->storeAs($dir, (string) $request->chunk_index, 'local');
+        $this->lessonVideoProcessing->storeReceivedChunk(
+            $request->file('chunk'),
+            (string) $request->upload_id,
+            $request->chunk_index
+        );
 
         return response()->json([
             'received' => true,

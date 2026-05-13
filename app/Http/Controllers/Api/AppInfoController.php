@@ -25,6 +25,19 @@ class AppInfoController extends Controller
         ]);
     }
 
+    /**
+     * حدود رفع الفيديو المجزأ (للمزامنة مع الواجهة دون بناء يدوي لـ VITE).
+     */
+    public function videoUploadLimits()
+    {
+        $maxKb = max(1024, (int) config('video.chunk_max_kb', 32768));
+
+        return response()->json([
+            'chunk_max_kb'    => $maxKb,
+            'chunk_max_bytes' => $maxKb * 1024,
+        ]);
+    }
+
     public function settings(Request $request)
     {
         return response()->json([

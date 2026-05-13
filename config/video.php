@@ -8,9 +8,9 @@ return [
     |--------------------------------------------------------------------------
     | Each chunk must be under PHP upload_max_filesize / post_max_size.
     | Smaller chunks = more requests but safer defaults (e.g. 8MB PHP limit).
-    | Larger chunks (e.g. 15MB) reduce round-trips when PHP limits allow it.
+    | Larger chunks reduce HTTP round-trips (faster on typical latency). Match PHP post limits.
     */
-    'chunk_max_kb' => (int) env('VIDEO_CHUNK_MAX_KB', 15360),
+    'chunk_max_kb' => (int) env('VIDEO_CHUNK_MAX_KB', 32768),
 
     'max_video_kb' => (int) env('VIDEO_MAX_KB', 512000),
 

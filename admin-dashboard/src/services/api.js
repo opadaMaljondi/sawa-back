@@ -5,6 +5,37 @@ import axios from 'axios';
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const storageURL = import.meta.env.VITE_STORAGE_URL || baseURL.replace('/api', '/storage');
 
+let cachedVideoChunkBytes = null;
+let cachedVideoChunkBytesAt = 0;
+const VIDEO_CHUNK_CACHE_MS = 120000;
+
+/**
+ * حجم جزء الرفع بالبايت — يُقرأ من السيرفر (config video.chunk_max_kb) مع تخزين مؤقت.
+ * يقلل طلبات HTTP مقارنة بجزء أصغر = رفع أسرع فعلياً على نفس السرعة.
+ */
+export async function getVideoUploadChunkBytes() {
+  const now = Date.now();
+  if (cachedVideoChunkBytes != null && now - cachedVideoChunkBytesAt < VIDEO_CHUNK_CACHE_MS) {
+    return cachedVideoChunkBytes;
+  }
+  try {
+    const lim = await axios.get(`${baseURL.replace(/\/$/, '')}/app/video-upload-limits`, {
+      timeout: 8000,
+    });
+    const kb = Number(lim.data?.chunk_max_kb);
+    if (Number.isFinite(kb) && kb >= 1024) {
+      cachedVideoChunkBytes = Math.floor(kb * 1024);
+      cachedVideoChunkBytesAt = now;
+      return cachedVideoChunkBytes;
+    }
+  } catch {
+    /* ignore */
+  }
+  cachedVideoChunkBytes = 32 * 1024 * 1024;
+  cachedVideoChunkBytesAt = now;
+  return cachedVideoChunkBytes;
+}
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL,

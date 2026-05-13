@@ -77,6 +77,7 @@ Route::get('years', fn () => response()->json(Year::where('active', true)->order
 Route::get('app/terms', [AppInfoController::class, 'terms']);
 Route::get('app/privacy', [AppInfoController::class, 'privacy']);
 Route::get('app/settings', [AppInfoController::class, 'settings']);
+Route::get('app/video-upload-limits', [AppInfoController::class, 'videoUploadLimits']);
 
 // Public Auth Routes
 Route::prefix('auth')->group(function () {
