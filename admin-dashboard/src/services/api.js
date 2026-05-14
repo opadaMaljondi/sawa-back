@@ -36,12 +36,13 @@ export async function getVideoUploadChunkBytes() {
   return cachedVideoChunkBytes;
 }
 
-// Create axios instance with default config
+// Create axios instance for admin API (Laravel Sanctum / JSON + multipart)
 const api = axios.create({
   baseURL,
-  timeout: 25000,
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
   },
 });
 

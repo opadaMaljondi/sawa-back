@@ -10,8 +10,8 @@ import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI, getVideoU
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { beginHeavyUpload, endHeavyUpload } from '../../utils/heavyUploadLock';
 
-/** Max parallel chunk uploads (HTTP/1.1 ~6 connections/host). */
-const VIDEO_CHUNK_PARALLEL = 6;
+/** توازي رفع الأجزاء — مع HTTP/2 يمكن رفع عدد أكبر من الطلبات على نفس الأصل. */
+const VIDEO_CHUNK_PARALLEL = 10;
 
 function chunkByteLength(fileSize, index, chunkBytes) {
   const start = index * chunkBytes;
@@ -27,14 +27,37 @@ function sleepMs(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function uploadChunkWithRetry(videosApi, formData, onUploadProgress, signal, retries = 3) {
+/** أخطاء يُعاد فيها رفع الجزء (شبكة، مهلة بروكسي، إلخ) — لا يُعاد عند 422/413. */
+function shouldRetryChunkUploadError(err) {
+  const status = err?.response?.status;
+  if (status === 422 || status === 413 || status === 401) return false;
+  if (status === 408 || status === 429 || status === 502 || status === 503 || status === 504) return true;
+  if (!err?.response) {
+    const code = err?.code;
+    const msg = String(err?.message || '');
+    if (code === 'ERR_NETWORK' || code === 'ECONNABORTED') return true;
+    if (msg === 'Network Error') return true;
+  }
+  return false;
+}
+
+async function uploadChunkWithRetry(videosApi, buildFormData, onUploadProgress, signal, retries = 7) {
   for (let attempt = 0; attempt < retries; attempt += 1) {
+    if (signal.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     try {
-      await videosApi.uploadChunk(formData, onUploadProgress, signal);
+      await videosApi.uploadChunk(buildFormData(), onUploadProgress, signal);
       return;
     } catch (err) {
-      if (attempt === retries - 1) throw err;
-      await sleepMs(400 * (attempt + 1));
+      if (signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const last = attempt === retries - 1;
+      if (!shouldRetryChunkUploadError(err) || last) {
+        throw err;
+      }
+      await sleepMs(Math.min(15000, 600 * 2 ** attempt));
     }
   }
 }
@@ -59,7 +82,7 @@ async function runChunkUploadPool(
       const i = cursor;
       cursor += 1;
       const task = tasks[i];
-      await uploadChunkWithRetry(videosApi, task.formData, task.onUploadProgress, signal);
+      await uploadChunkWithRetry(videosApi, task.buildFormData, task.onUploadProgress, signal);
       onTaskDone(task.index);
     }
   }
@@ -502,26 +525,26 @@ const CourseDetails = () => {
           }, 120);
         };
 
-        const tasks = pendingIndices.map((i) => {
-          const sliceStart = i * videoChunkBytes;
-          const blob = lessonFile.slice(sliceStart, sliceStart + videoChunkBytes);
-          const chunkFd = new FormData();
-          chunkFd.append('upload_id', uploadId);
-          chunkFd.append('chunk_index', String(i));
-          chunkFd.append('total_chunks', String(totalChunks));
-          chunkFd.append('original_name', lessonFile.name);
-          chunkFd.append('chunk', blob, lessonFile.name);
-          return {
-            index: i,
-            formData: chunkFd,
-            onUploadProgress: (ev) => {
-              if (ev.total) {
-                inflightLoaded[i] = ev.loaded;
-                scheduleProgressRecompute();
-              }
-            },
-          };
-        });
+        const tasks = pendingIndices.map((i) => ({
+          index: i,
+          buildFormData: () => {
+            const sliceStart = i * videoChunkBytes;
+            const blob = lessonFile.slice(sliceStart, sliceStart + videoChunkBytes);
+            const chunkFd = new FormData();
+            chunkFd.append('upload_id', uploadId);
+            chunkFd.append('chunk_index', String(i));
+            chunkFd.append('total_chunks', String(totalChunks));
+            chunkFd.append('original_name', lessonFile.name);
+            chunkFd.append('chunk', blob, lessonFile.name);
+            return chunkFd;
+          },
+          onUploadProgress: (ev) => {
+            if (ev.total) {
+              inflightLoaded[i] = ev.loaded;
+              scheduleProgressRecompute();
+            }
+          },
+        }));
 
         const bumpAfterPart = (chunkIndex) => {
           received.add(chunkIndex);
@@ -681,7 +704,18 @@ const CourseDetails = () => {
       if (err?.message === 'UPLOAD_CANCELLED') {
         setLessonError('تم إلغاء الرفع.');
       } else {
-        setLessonError(err.response?.data?.message || err.message || 'فشل رفع الفيديو');
+        const st = err?.response?.status;
+        const apiMsg = err?.response?.data?.message;
+        if (!err?.response && String(err?.message || '').includes('Network')) {
+          setLessonError('انقطعت الشبكة أثناء الرفع. أعد المحاولة بعد استقرار الاتصال (Wi‑Fi / VPN).');
+        } else if (st === 408) {
+          setLessonError(
+            apiMsg ||
+              'انتهت مهلة رفع الجزء (408). زِد مهلة البروكسي/Nginx على السيرفر أو أعد المحاولة.',
+          );
+        } else {
+          setLessonError(apiMsg || err.message || 'فشل رفع الفيديو');
+        }
       }
     } finally {
       endHeavyUpload();
