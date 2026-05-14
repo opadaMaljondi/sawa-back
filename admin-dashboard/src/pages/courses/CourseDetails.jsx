@@ -8,6 +8,7 @@ import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
 import { coursesAPI, courseSectionsAPI, videosAPI, notesAPI, examsAPI, getVideoUploadChunkBytes } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { beginHeavyUpload, endHeavyUpload } from '../../utils/heavyUploadLock';
 
 /** Max parallel chunk uploads (HTTP/1.1 ~6 connections/host). */
 const VIDEO_CHUNK_PARALLEL = 6;
@@ -423,6 +424,7 @@ const CourseDetails = () => {
 
     try {
       setLessonLoading(true);
+      beginHeavyUpload();
       setUploadProgress(0);
       chunkPauseRef.current = false;
       chunkAbortRef.current = false;
@@ -682,6 +684,7 @@ const CourseDetails = () => {
         setLessonError(err.response?.data?.message || err.message || 'فشل رفع الفيديو');
       }
     } finally {
+      endHeavyUpload();
       setLessonLoading(false);
       chunkPauseRef.current = false;
       chunkAbortRef.current = false;

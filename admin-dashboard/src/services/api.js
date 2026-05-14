@@ -374,7 +374,10 @@ export const adminAPI = {
 export const notificationsAPI = {
   send: (data) => api.post('/admin/notifications/send', data),
   getNotifications: (page = 1) => api.get(`/admin/notifications?page=${page}`),
-  getUnreadCount: () => api.get('/admin/notifications/unread-count'),
+  getUnreadCount: () =>
+    api.get('/admin/notifications/unread-count', {
+      timeout: 90000,
+    }),
   markAsRead: (id) => api.post(`/admin/notifications/${id}/read`),
 };
 

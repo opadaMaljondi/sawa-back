@@ -21,6 +21,7 @@ import {
     QrCode
 } from 'lucide-react';
 import { notificationsAPI } from '../../services/api';
+import { isHeavyUploadLocked } from '../../utils/heavyUploadLock';
 import { isFirebaseClientConfigured, subscribeAdminAlerts } from '../../services/firebaseClient';
 import {
     getBrowserNotificationPermission,
@@ -57,6 +58,9 @@ const Header = ({ onMenuClick }) => {
         user?.type === 'admin' && isFirebaseClientConfigured() && browserNotifPermission !== 'unsupported';
 
     const fetchUnreadCount = useCallback(async () => {
+        if (isHeavyUploadLocked()) {
+            return;
+        }
         try {
             const res = await notificationsAPI.getUnreadCount();
             const newCount = Number(res?.unread_count ?? 0);
@@ -103,7 +107,14 @@ const Header = ({ onMenuClick }) => {
         }
         fetchUnreadCount();
         const interval = setInterval(fetchUnreadCount, 30000);
-        return () => clearInterval(interval);
+        const onHeavyEnded = () => {
+            fetchUnreadCount();
+        };
+        window.addEventListener('sawa-heavy-upload-ended', onHeavyEnded);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('sawa-heavy-upload-ended', onHeavyEnded);
+        };
     }, [isAuthenticated, user?.type, fetchUnreadCount]);
 
     /** استقبال فوري من Firebase Realtime (نفس مسار الخادم: sawa/admin_alerts) */
