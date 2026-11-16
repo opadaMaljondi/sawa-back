@@ -14,6 +14,10 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('courses:deactivate-expired-enrollments')->dailyAt('06:00');
         $schedule->command('database:backup')->dailyAt('02:15')->withoutOverlapping(120);
+        $schedule->command('videos:migrate-local-to-r2 --limit=1')
+            ->everyMinute()
+            ->withoutOverlapping(120)
+            ->runInBackground();
     }
 
     /**

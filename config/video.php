@@ -41,4 +41,9 @@ return [
     */
     'r2_direct_part_kb' => (int) env('VIDEO_R2_DIRECT_PART_KB', 16384),
 
+    /*
+    | Background copy of video_provider=local lessons onto R2 (scheduled command).
+    */
+    'migrate_local_to_r2' => filter_var((string) env('VIDEO_MIGRATE_LOCAL_TO_R2', 'true'), FILTER_VALIDATE_BOOLEAN),
+
 ];
