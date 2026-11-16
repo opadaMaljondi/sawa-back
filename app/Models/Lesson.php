@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\YouTubeService;
+use App\Support\VideoCloudDisk;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +24,7 @@ class Lesson extends Model
         'thumbnail',
         'video_provider',
         'video_reference',
+        'video_variants',
         'price',
         'is_free',
         'can_download',
@@ -39,9 +41,10 @@ class Lesson extends Model
         'can_purchase_alone' => 'boolean',
         'active' => 'boolean',
         'duration' => 'integer',
+        'video_variants' => 'array',
     ];
 
-    protected $appends = ['video_playback_url', 'video_embed_url', 'thumbnail_url'];
+    protected $appends = ['video_playback_url', 'video_embed_url', 'thumbnail_url', 'video_quality_urls'];
 
     /** الدروس الظاهرة للطالب (موافق عليها من الأدمن). */
     public function scopeApprovedForStudents($query)
@@ -71,10 +74,8 @@ class Lesson extends Model
                     : null);
         }
 
-        if ($this->video_provider === 'aws') {
-            return $this->video_reference
-                ? Storage::disk('s3')->url($this->video_reference)
-                : null;
+        if (VideoCloudDisk::isCloudProvider($this->video_provider)) {
+            return $this->cloudObjectUrl($this->video_reference);
         }
 
         if ($this->video_provider === 'youtube') {
@@ -90,8 +91,8 @@ class Lesson extends Model
             return null;
         }
 
-        if ($this->video_provider === 'local' || $this->video_provider === 'aws') {
-            return $this->video_playback_url; // Direct file URL works for video tag
+        if ($this->video_provider === 'local' || VideoCloudDisk::isCloudProvider($this->video_provider)) {
+            return $this->video_playback_url;
         }
 
         if ($this->video_provider === 'youtube') {
@@ -99,6 +100,62 @@ class Lesson extends Model
         }
 
         return null;
+    }
+
+    /**
+     * روابط الجودات بعد الترانسكود (360p/720p/1080p) إن وُجدت.
+     *
+     * @return array<string, string>
+     */
+    public function getVideoQualityUrlsAttribute(): array
+    {
+        $out = [];
+        $variants = is_array($this->video_variants) ? $this->video_variants : [];
+        foreach ($variants as $label => $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+            $url = $this->urlForStoredVideoPath($path);
+            if ($url) {
+                $out[(string) $label] = $url;
+            }
+        }
+
+        return $out;
+    }
+
+    public function urlForStoredVideoPath(string $path): ?string
+    {
+        if ($this->video_provider === 'local') {
+            return Storage::disk('public')->exists($path)
+                ? Storage::disk('public')->url($path)
+                : null;
+        }
+
+        if (VideoCloudDisk::isCloudProvider($this->video_provider)) {
+            return $this->cloudObjectUrl($path);
+        }
+
+        return null;
+    }
+
+    private function cloudObjectUrl(string $path): ?string
+    {
+        try {
+            $disk = VideoCloudDisk::diskName($this->video_provider);
+            $cfgUrl = (string) (config("filesystems.disks.{$disk}.url") ?? '');
+            if ($cfgUrl !== '') {
+                return Storage::disk($disk)->url($path);
+            }
+
+            return Storage::disk($disk)->temporaryUrl($path, now()->addHours(6));
+        } catch (\Throwable) {
+            try {
+                return Storage::disk(VideoCloudDisk::diskName($this->video_provider))->url($path);
+            } catch (\Throwable) {
+                return null;
+            }
+        }
     }
 
     /**

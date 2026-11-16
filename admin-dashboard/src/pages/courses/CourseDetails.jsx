@@ -426,7 +426,10 @@ const CourseDetails = () => {
   const submitLesson = async (e) => {
     e.preventDefault();
     setLessonError('');
-    const needsUploadOnly = lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws';
+    const needsUploadOnly =
+      lessonForm.video_provider === 'local' ||
+      lessonForm.video_provider === 'aws' ||
+      lessonForm.video_provider === 'r2';
     if (needsUploadOnly && !lessonFile) {
       setLessonError('اختر ملف الفيديو للرفع');
       return;
@@ -1684,7 +1687,9 @@ const CourseDetails = () => {
           {lessonError && <div className="login-error">{lessonError}</div>}
           {lessonError &&
             lessonFile &&
-            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') &&
+            (lessonForm.video_provider === 'local' ||
+              lessonForm.video_provider === 'aws' ||
+              lessonForm.video_provider === 'r2') &&
             lessonFile.size > videoChunkBytesHint && (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1764,7 +1769,8 @@ const CourseDetails = () => {
                       }
                     >
                       <option value="youtube">YouTube</option>
-                      <option value="local">Local Storage</option>
+                      <option value="local">محلي (Local)</option>
+                      <option value="r2">Cloudflare R2</option>
                       <option value="aws">AWS S3</option>
                     </select>
                   </div>
@@ -1788,9 +1794,11 @@ const CourseDetails = () => {
                     <label className="input-label">
                       {lessonForm.video_provider === 'youtube'
                         ? 'أو رفع ملف فيديو (لليوتيوب)'
-                        : lessonForm.video_provider === 'aws'
-                          ? 'رفع ملف فيديو (AWS S3)'
-                          : 'رفع ملف فيديو (محلي)'}
+                        : lessonForm.video_provider === 'r2'
+                          ? 'رفع ملف فيديو (Cloudflare R2)'
+                          : lessonForm.video_provider === 'aws'
+                            ? 'رفع ملف فيديو (AWS S3)'
+                            : 'رفع ملف فيديو (محلي)'}
                     </label>
                     <input
                       type="file"
@@ -1872,7 +1880,9 @@ const CourseDetails = () => {
 
           {lessonLoading &&
             lessonFile &&
-            (lessonForm.video_provider === 'local' || lessonForm.video_provider === 'aws') && (
+            (lessonForm.video_provider === 'local' ||
+              lessonForm.video_provider === 'aws' ||
+              lessonForm.video_provider === 'r2') && (
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-3">
                 {lessonFile.size > videoChunkBytesHint && (
                   <div className="flex flex-wrap gap-2 items-center">
@@ -2014,7 +2024,8 @@ const CourseDetails = () => {
                       }
                     >
                       <option value="youtube">YouTube</option>
-                      <option value="local">Local Storage</option>
+                      <option value="local">محلي (Local)</option>
+                      <option value="r2">Cloudflare R2</option>
                       <option value="aws">AWS S3</option>
                     </select>
                   </div>

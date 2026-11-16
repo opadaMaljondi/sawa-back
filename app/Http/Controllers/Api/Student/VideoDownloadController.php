@@ -7,6 +7,7 @@ use App\Models\DownloadedLesson;
 use App\Models\Lesson;
 use App\Services\VideoEncryptionService;
 use App\Services\YouTubeService;
+use App\Support\VideoCloudDisk;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -44,7 +45,7 @@ class VideoDownloadController extends Controller
 
         if ($lesson->video_provider === 'youtube') {
             return response()->json([
-                'message'        => 'This lesson is hosted on YouTube. Use playback_url in your player; offline file packaging is only for hosted videos (local/S3).',
+                'message'        => 'This lesson is hosted on YouTube. Use playback_url in your player; offline file packaging is only for hosted videos (local/S3/R2).',
                 'video_provider' => 'youtube',
                 'playback_url'   => YouTubeService::playbackUrl((string) $lesson->video_reference),
                 'embed_url'      => YouTubeService::embedUrl((string) $lesson->video_reference),
@@ -61,7 +62,7 @@ class VideoDownloadController extends Controller
 
         $encryptionData = $this->encryptionService->encryptVideo($sourcePath, $encryptedPath);
 
-        if ($lesson->video_provider === 'aws' && str_starts_with($sourcePath, storage_path('app/videos/temp'))) {
+        if (VideoCloudDisk::isCloudProvider($lesson->video_provider) && str_starts_with($sourcePath, storage_path('app/videos/temp'))) {
             @unlink($sourcePath);
         }
 
@@ -144,13 +145,14 @@ class VideoDownloadController extends Controller
             ]);
         }
 
-        if ($lesson->video_provider === 'aws') {
+        if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
             try {
-                $url = Storage::disk('s3')->temporaryUrl(
+                $disk = VideoCloudDisk::diskName($lesson->video_provider);
+                $url = Storage::disk($disk)->temporaryUrl(
                     $lesson->video_reference,
                     now()->addMinutes(120),
                     [
-                        'ResponseContent-Type' => 'video/mp4',
+                        'ResponseContentType' => 'video/mp4',
                     ]
                 );
             } catch (\Throwable $e) {
@@ -161,10 +163,11 @@ class VideoDownloadController extends Controller
 
             return response()->json([
                 'message'              => 'Use stream_url with Range requests for chunked download.',
-                'video_provider'       => 'aws',
+                'video_provider'       => $lesson->video_provider,
                 'stream_url'           => $url,
                 'supports_http_range'  => true,
                 'expires_in_minutes'   => 120,
+                'quality_urls'         => $lesson->video_quality_urls,
             ]);
         }
 
@@ -180,7 +183,7 @@ class VideoDownloadController extends Controller
             return $this->resolveLocalVideoAbsolutePath($lesson);
         }
 
-        if ($lesson->video_provider === 'aws') {
+        if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
             $tmpRelative = 'videos/temp/enc_'.Str::uuid().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($lesson->video_reference));
             $full        = storage_path('app/'.$tmpRelative);
             $dir         = dirname($full);
@@ -188,7 +191,7 @@ class VideoDownloadController extends Controller
                 mkdir($dir, 0755, true);
             }
             try {
-                $stream = Storage::disk('s3')->readStream($lesson->video_reference);
+                $stream = Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->readStream($lesson->video_reference);
                 if (! $stream) {
                     return null;
                 }

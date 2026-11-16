@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Instructor;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\FinalizeChunkedVideoUpload;
+use App\Jobs\TranscodeLessonVideoQualities;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use App\Support\FullCourseContentNotifier;
 use App\Support\InstructorAdminNotifier;
+use App\Support\VideoCloudDisk;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -51,7 +53,7 @@ class VideoController extends Controller
             'is_free' => 'boolean',
             'can_download' => 'boolean',
             'order' => 'nullable|integer',
-            'video_provider' => 'nullable|in:youtube,local,aws',
+            'video_provider' => 'nullable|in:youtube,local,aws,r2',
             'metadata' => 'nullable|string|max:65535',
         ]);
 
@@ -77,46 +79,19 @@ class VideoController extends Controller
 
         $videoReference = null;
 
-        if ($videoProvider === 'aws') {
-            $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $s3Path = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
-            try {
-                Storage::disk('s3')->put($s3Path, file_get_contents($fullTempPath), ['visibility' => 'public']);
-            } catch (\Throwable $e) {
-                Storage::disk('local')->delete($tempPath);
-
-                return response()->json([
-                    'message' => 'Failed to upload video to S3: '.$e->getMessage(),
-                ], 422);
-            }
+        try {
+            [$videoProvider, $videoReference] = $this->lessonVideoProcessing->processUploadedVideoFile(
+                $fullTempPath,
+                $request,
+                $course,
+                $videoProvider,
+                $request->file('video')->getClientOriginalExtension() ?: 'mp4',
+                $tempPath
+            );
+        } catch (\RuntimeException $e) {
             Storage::disk('local')->delete($tempPath);
-            $videoReference = $s3Path;
-        } elseif ($videoProvider === 'local') {
-            $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-            $localPath = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
-            Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
-            Storage::disk('local')->delete($tempPath);
-            $videoReference = $localPath;
-        } else {
-            $videoId = $this->youtubeService->uploadVideo($fullTempPath, [
-                'title' => $request->title,
-                'description' => $request->filled('description')
-                    ? (string) $request->description
-                    : "Course: {$course->title}",
-                'privacy_status' => 'unlisted',
-            ]);
 
-            if ($videoId) {
-                $videoReference = $videoId;
-                Storage::disk('local')->delete($tempPath);
-            } else {
-                $extension = $request->file('video')->getClientOriginalExtension() ?: 'mp4';
-                $localPath = "videos/lessons/course_{$course->id}/".Str::random(40).'.'.$extension;
-                Storage::disk('public')->put($localPath, file_get_contents($fullTempPath));
-                Storage::disk('local')->delete($tempPath);
-                $videoProvider = 'local';
-                $videoReference = $localPath;
-            }
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
         $thumbnailPath = $this->storeLessonThumbnail($request, $course);
@@ -167,12 +142,16 @@ class VideoController extends Controller
             $message = 'Video uploaded successfully. Waiting for admin approval.';
         } elseif ($videoProvider === 'aws') {
             $message = 'Video uploaded to S3. Waiting for admin approval.';
+        } elseif ($videoProvider === 'r2') {
+            $message = 'Video uploaded to Cloudflare R2. Waiting for admin approval.';
         } else {
             $message = 'Video saved locally. Waiting for admin approval.';
             if ($request->input('video_provider') === 'youtube') {
                 $message .= ' (YouTube: '.($this->youtubeService->getLastError() ?? 'not configured').')';
             }
         }
+
+        $this->maybeDispatchVideoTranscode($lesson);
 
         return response()->json([
             'message' => $message,
@@ -278,8 +257,17 @@ class VideoController extends Controller
             $this->youtubeService->deleteVideo($lesson->video_reference);
         } elseif ($lesson->video_provider === 'local' && $lesson->video_reference) {
             Storage::disk('public')->delete($lesson->video_reference);
-        } elseif ($lesson->video_provider === 'aws' && $lesson->video_reference) {
-            Storage::disk('s3')->delete($lesson->video_reference);
+        } elseif (VideoCloudDisk::isCloudProvider($lesson->video_provider) && $lesson->video_reference) {
+            try {
+                Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->delete($lesson->video_reference);
+                foreach ((array) ($lesson->video_variants ?? []) as $variantPath) {
+                    if (is_string($variantPath) && $variantPath !== '') {
+                        Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->delete($variantPath);
+                    }
+                }
+            } catch (\Throwable) {
+                /* ignore */
+            }
         }
 
         $this->deleteStoredThumbnailIfRelative($lesson->getRawOriginal('thumbnail'));
@@ -426,7 +414,7 @@ class VideoController extends Controller
             'upload_id' => 'required|uuid',
             'total_chunks' => 'required|integer|min:1|max:10000',
             'original_name' => 'required|string|max:255',
-            'video_provider' => 'required|in:local,aws',
+            'video_provider' => 'required|in:local,aws,r2',
             'course_id' => 'required|exists:courses,id',
             'title' => 'required|string|max:255',
             'is_free' => 'boolean',
@@ -619,12 +607,25 @@ class VideoController extends Controller
             ]);
         }
 
+        $this->maybeDispatchVideoTranscode($lesson);
+
         return response()->json([
             'message' => $publishInstantly ? 'Video uploaded and published successfully.' : $message,
             'lesson' => $lesson->fresh(),
             'video_provider' => $videoProvider,
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
+    }
+
+    private function maybeDispatchVideoTranscode(Lesson $lesson): void
+    {
+        if (! config('video.transcode_enabled')) {
+            return;
+        }
+        if (! in_array($lesson->video_provider, ['local', 'aws', 'r2'], true)) {
+            return;
+        }
+        TranscodeLessonVideoQualities::dispatch($lesson->id);
     }
 
     private function storeLessonThumbnail(Request $request, Course $course): ?string

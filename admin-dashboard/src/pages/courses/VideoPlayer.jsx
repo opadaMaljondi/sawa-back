@@ -80,22 +80,44 @@ const VideoPlayer = () => {
     }
 
     if (
-      (lesson.video_provider === 'local' || lesson.video_provider === 'aws') &&
+      (lesson.video_provider === 'local' ||
+        lesson.video_provider === 'aws' ||
+        lesson.video_provider === 'r2') &&
       lesson.video_playback_url
     ) {
+      const qualityUrls = lesson.video_quality_urls || {};
+      const qualityEntries = Object.entries(qualityUrls);
       return (
-        <div
-          className="w-full bg-black rounded-lg overflow-hidden flex items-center justify-center"
-          style={{ height: '70vh', maxHeight: 'calc(100vh - 180px)' }}
-        >
-          <video
-            src={lesson.video_playback_url}
-            controls
-            className="max-w-full max-h-full"
-            title={lesson.title}
+        <div className="space-y-2">
+          {qualityEntries.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="text-gray-500">الجودة:</span>
+              {qualityEntries.map(([label, url]) => (
+                <a
+                  key={label}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200"
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+          )}
+          <div
+            className="w-full bg-black rounded-lg overflow-hidden flex items-center justify-center"
+            style={{ height: '70vh', maxHeight: 'calc(100vh - 180px)' }}
           >
-            المتصفح لا يدعم تشغيل هذا الفيديو.
-          </video>
+            <video
+              src={lesson.video_playback_url}
+              controls
+              className="max-w-full max-h-full"
+              title={lesson.title}
+            >
+              المتصفح لا يدعم تشغيل هذا الفيديو.
+            </video>
+          </div>
         </div>
       );
     }
@@ -140,7 +162,9 @@ const VideoPlayer = () => {
                 </p>
               )}
               {lesson.video_playback_url &&
-                (lesson.video_provider === 'local' || lesson.video_provider === 'aws') && (
+                (lesson.video_provider === 'local' ||
+                  lesson.video_provider === 'aws' ||
+                  lesson.video_provider === 'r2') && (
                   <p>
                     <strong>رابط الملف: </strong>
                     <a href={lesson.video_playback_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">

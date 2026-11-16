@@ -213,7 +213,7 @@ export const videosAPI = {
   /** Delete partial chunks on server (cancel session). */
   abandonChunkUpload: (params) =>
     api.delete('/admin/videos/chunk/session', { params }),
-  /** One part of a chunked upload (local / aws). */
+  /** One part of a chunked upload (local / aws / r2). */
   uploadChunk: (formData, onUploadProgress, signal) =>
     api.post('/admin/videos/chunk', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -221,7 +221,7 @@ export const videosAPI = {
       onUploadProgress,
       signal,
     }),
-  /** Merge chunks and create lesson (local / aws). */
+  /** Merge chunks and create lesson (local / aws / r2). */
   completeChunkUpload: (formData, onUploadProgress) =>
     api.post('/admin/videos/chunk/complete', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

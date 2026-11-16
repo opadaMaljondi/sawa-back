@@ -109,6 +109,10 @@ class FinalizeChunkedVideoUpload implements ShouldQueue
             $lessonVideoProcessing->deleteChunkDirectory($uploadId);
             Cache::forget('chunk_merge_active:'.$uploadId);
 
+            if (config('video.transcode_enabled') && in_array($videoProvider, ['local', 'aws', 'r2'], true)) {
+                TranscodeLessonVideoQualities::dispatch($lesson->id);
+            }
+
             if ($context === 'admin') {
                 FullCourseContentNotifier::lessonPublished($lesson->fresh());
             } else {

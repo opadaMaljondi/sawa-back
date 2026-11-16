@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Course;
+use App\Support\VideoCloudDisk;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -73,16 +74,30 @@ class LessonVideoProcessingService
             }
         };
 
-        if ($videoProvider === 'aws') {
-            $s3Path = "videos/lessons/course_{$course->id}/".Str::random(40).".{$ext}";
+        if (VideoCloudDisk::isCloudProvider($videoProvider)) {
+            $disk = VideoCloudDisk::diskName($videoProvider);
+            $objectPath = "videos/lessons/course_{$course->id}/".Str::random(40).".{$ext}";
             try {
-                Storage::disk('s3')->put($s3Path, file_get_contents($fullTempPath), ['visibility' => 'public']);
+                // Stream from disk to avoid loading huge files into PHP memory.
+                $stream = fopen($fullTempPath, 'rb');
+                if ($stream === false) {
+                    throw new \RuntimeException('Could not open merged temp video for cloud upload.');
+                }
+                Storage::disk($disk)->put($objectPath, $stream);
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
             } catch (\Throwable $e) {
-                throw new \RuntimeException('Failed to upload video to S3: '.$e->getMessage());
+                $label = $videoProvider === 'r2' ? 'Cloudflare R2' : 'AWS S3';
+                throw new \RuntimeException("Failed to upload video to {$label}: ".$e->getMessage());
             }
             $deleteTemp();
 
-            return ['aws', $s3Path, 'Video uploaded successfully to AWS S3.'];
+            $msg = $videoProvider === 'r2'
+                ? 'Video uploaded successfully to Cloudflare R2.'
+                : 'Video uploaded successfully to AWS S3.';
+
+            return [$videoProvider, $objectPath, $msg];
         }
 
         if ($videoProvider === 'local') {

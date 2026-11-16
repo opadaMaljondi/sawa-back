@@ -8,7 +8,9 @@ use App\Models\Lesson;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use App\Jobs\FinalizeChunkedVideoUpload;
+use App\Jobs\TranscodeLessonVideoQualities;
 use App\Support\FullCourseContentNotifier;
+use App\Support\VideoCloudDisk;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -46,7 +48,7 @@ class VideoController extends Controller
             'can_download' => 'boolean',
             'can_purchase_alone' => 'boolean',
             'order' => 'nullable|integer',
-            'video_provider' => 'nullable|in:youtube,local,aws',
+            'video_provider' => 'nullable|in:youtube,local,aws,r2',
             'thumbnail' => 'nullable|image|max:2048',
             // One of these is required (youtube_url and video_url are aliases):
             'youtube_url' => 'required_without_all:video_url,video|nullable|url',
@@ -112,6 +114,7 @@ class VideoController extends Controller
         ]);
 
         FullCourseContentNotifier::lessonPublished($lesson->fresh());
+        $this->maybeDispatchVideoTranscode($lesson);
 
         return response()->json([
             'message' => $message,
@@ -122,7 +125,7 @@ class VideoController extends Controller
     }
 
     /**
-     * Receive one chunk of a chunked video upload (local / aws only). Call completeChunkUpload when done.
+     * Receive one chunk of a chunked video upload (local / aws / r2). Call completeChunkUpload when done.
      */
     public function uploadChunk(Request $request)
     {
@@ -231,7 +234,7 @@ class VideoController extends Controller
             'upload_id' => 'required|uuid',
             'total_chunks' => 'required|integer|min:1|max:10000',
             'original_name' => 'required|string|max:255',
-            'video_provider' => 'required|in:local,aws',
+            'video_provider' => 'required|in:local,aws,r2',
             'course_id' => 'required|exists:courses,id',
             'section_id' => 'nullable|exists:course_sections,id',
             'title' => 'required|string|max:255',
@@ -394,6 +397,7 @@ class VideoController extends Controller
         ]);
 
         FullCourseContentNotifier::lessonPublished($lesson->fresh());
+        $this->maybeDispatchVideoTranscode($lesson);
 
         return response()->json([
             'message' => $message,
@@ -422,7 +426,7 @@ class VideoController extends Controller
             'order' => 'nullable|integer',
             'approval_status' => 'sometimes|in:pending,approved,rejected',
             'active' => 'boolean',
-            'video_provider' => 'sometimes|in:youtube,local,aws',
+            'video_provider' => 'sometimes|in:youtube,local,aws,r2',
             'thumbnail' => 'nullable|image|max:2048',
             'youtube_url' => 'sometimes|url',
         ]);
@@ -490,13 +494,33 @@ class VideoController extends Controller
             $this->youtubeService->deleteVideo($lesson->video_reference);
         } elseif ($lesson->video_provider === 'local' && $lesson->video_reference) {
             Storage::disk('public')->delete($lesson->video_reference);
-        } elseif ($lesson->video_provider === 'aws' && $lesson->video_reference) {
-            Storage::disk('s3')->delete($lesson->video_reference);
+        } elseif (VideoCloudDisk::isCloudProvider($lesson->video_provider) && $lesson->video_reference) {
+            try {
+                Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->delete($lesson->video_reference);
+                foreach ((array) ($lesson->video_variants ?? []) as $variantPath) {
+                    if (is_string($variantPath) && $variantPath !== '') {
+                        Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->delete($variantPath);
+                    }
+                }
+            } catch (\Throwable) {
+                /* ignore cloud delete errors */
+            }
         }
 
         $lesson->delete();
 
         return response()->json(['message' => 'Video deleted successfully']);
+    }
+
+    private function maybeDispatchVideoTranscode(Lesson $lesson): void
+    {
+        if (! config('video.transcode_enabled')) {
+            return;
+        }
+        if (! in_array($lesson->video_provider, ['local', 'aws', 'r2'], true)) {
+            return;
+        }
+        TranscodeLessonVideoQualities::dispatch($lesson->id);
     }
 
     private function resolvedCanPurchaseAlone(Request $request, Course $course): bool
