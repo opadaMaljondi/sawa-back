@@ -99,6 +99,13 @@ class EnrollmentController extends Controller
                 $request->note_id
             );
 
+            if ($price <= 0) {
+                return response()->json([
+                    'message' => 'This item is free and already available.',
+                    'free' => true,
+                ]);
+            }
+
             $originalPrice = $price;
             $discount = 0;
             $renewalDiscount = $this->renewalDiscountService->computeDiscountAmount($course, $student->id, $price);
@@ -226,8 +233,8 @@ class EnrollmentController extends Controller
     {
         return match ($type) {
             'full_course' => (float) $course->price,
-            'section'     => (float) (\App\Models\CourseSection::findOrFail($sectionId)->price ?? $course->price),
-            'lesson'      => (float) (\App\Models\Lesson::findOrFail($lessonId)->price ?? $course->price),
+            'section'     => (float) (\App\Models\CourseSection::findOrFail($sectionId)->price ?? 0),
+            'lesson'      => (float) (\App\Models\Lesson::findOrFail($lessonId)->price ?? 0),
             'attachment'  => (float) (Note::findOrFail($noteId)->price ?? 0),
             default       => 0.0,
         };

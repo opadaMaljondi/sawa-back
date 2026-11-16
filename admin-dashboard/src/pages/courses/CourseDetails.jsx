@@ -406,7 +406,7 @@ const CourseDetails = () => {
         title: sectionForm.title,
         description: sectionForm.description,
         order: Number(sectionForm.order) || 1,
-        price: sectionForm.price ? Number(sectionForm.price) : null,
+        price: sectionForm.price === '' || sectionForm.price == null ? 0 : Number(sectionForm.price),
       };
       if (editingSection) {
         await courseSectionsAPI.update(editingSection.id, payload);

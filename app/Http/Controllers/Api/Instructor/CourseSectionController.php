@@ -57,7 +57,7 @@ class CourseSectionController extends Controller
             'title'       => $request->title,
             'description' => $request->description,
             'order'       => $request->input('order', 1),
-            'price'       => $request->input('price'),
+            'price'       => $request->filled('price') ? $request->input('price') : 0,
         ]);
 
         FullCourseContentNotifier::sectionCreated($section);

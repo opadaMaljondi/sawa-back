@@ -129,11 +129,21 @@ class User extends Authenticatable
         if (!$courseId) {
             return false;
         }
-        if ($lesson->is_free) {
+        if ($lesson->is_free || (float) ($lesson->price ?? 0) <= 0) {
             return true;
         }
 
-        $sectionId = $lesson->section_id ?? $lesson->section?->id;
+        $course = \App\Models\Course::find($courseId);
+        if ($course && (float) ($course->price ?? 0) <= 0) {
+            return true;
+        }
+
+        $section = $lesson->section;
+        if ($section && (float) ($section->price ?? 0) <= 0) {
+            return true;
+        }
+
+        $sectionId = $lesson->section_id ?? $section?->id;
 
         return Enrollment::where('student_id', $this->id)
             ->where('active', true)
@@ -155,6 +165,15 @@ class User extends Authenticatable
     {
         if ($this->type === 'admin') return true;
         if ($this->type !== 'student') return false;
+
+        $note = \App\Models\Note::find($noteId);
+        if ($note && ($note->is_free || (float) ($note->price ?? 0) <= 0)) {
+            return true;
+        }
+        $course = \App\Models\Course::find($courseId);
+        if ($course && (float) ($course->price ?? 0) <= 0) {
+            return true;
+        }
 
         // Full-course enrollment → access to all course notes
         if ($this->hasFullCourseAccess($courseId)) return true;

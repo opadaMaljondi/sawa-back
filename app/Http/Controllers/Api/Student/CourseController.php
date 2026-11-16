@@ -239,12 +239,19 @@ class CourseController extends Controller
         $sections = $course->sections->map(function ($section) use (
             $course, $hasFullCourse, $enrolledSectionIds, $enrolledLessonIds
         ) {
-            $sectionAccessible = $hasFullCourse || in_array($section->id, $enrolledSectionIds);
+            $courseFree = (float) ($course->price ?? 0) <= 0;
+            $sectionFree = $courseFree || (float) ($section->price ?? 0) <= 0;
+            $sectionAccessible = $hasFullCourse
+                || $sectionFree
+                || in_array($section->id, $enrolledSectionIds);
 
             $lessons = $section->lessons->map(function ($lesson) use (
-                $course, $hasFullCourse, $sectionAccessible, $enrolledLessonIds
+                $course, $hasFullCourse, $sectionAccessible, $enrolledLessonIds, $sectionFree
             ) {
-                $lessonAccessible = $lesson->is_free
+                $lessonFree = $lesson->is_free
+                    || $sectionFree
+                    || (float) ($lesson->price ?? 0) <= 0;
+                $lessonAccessible = $lessonFree
                     || $hasFullCourse
                     || $sectionAccessible
                     || in_array($lesson->id, $enrolledLessonIds);
@@ -285,7 +292,11 @@ class CourseController extends Controller
         $attachments = [];
 
         foreach ($course->notes as $note) {
-            $noteAccessible = $note->is_free || $hasFullCourse || in_array($note->id, $enrolledNoteIds);
+            $noteAccessible = $note->is_free
+                || (float) ($note->price ?? 0) <= 0
+                || (float) ($course->price ?? 0) <= 0
+                || $hasFullCourse
+                || in_array($note->id, $enrolledNoteIds);
 
             $fileUrl = null;
             if ($noteAccessible && $note->file_path) {
