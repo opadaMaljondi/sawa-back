@@ -323,6 +323,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('videos/chunk/session', [AdminVideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [AdminVideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [AdminVideoController::class, 'completeChunkUpload']);
+    Route::post('videos/r2/initiate', [AdminVideoController::class, 'r2Initiate']);
+    Route::post('videos/r2/presign', [AdminVideoController::class, 'r2Presign']);
+    Route::get('videos/r2/status', [AdminVideoController::class, 'r2Status']);
+    Route::delete('videos/r2/session', [AdminVideoController::class, 'r2Abort']);
+    Route::post('videos/r2/complete', [AdminVideoController::class, 'r2Complete']);
     Route::post('videos', [AdminVideoController::class, 'upload']);
     Route::put('videos/{lessonId}', [AdminVideoController::class, 'update']);
     Route::delete('videos/{lessonId}', [AdminVideoController::class, 'destroy']);

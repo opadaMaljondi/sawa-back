@@ -27,6 +27,41 @@ function sleepMs(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function r2UploadStorageKey(courseId, file) {
+  if (!file || !courseId) return '';
+  return `sawa_video_r2:${courseId}:${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function putBlobToR2(url, blob, signal, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.timeout = 0;
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && onProgress) onProgress(ev.loaded, ev.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.getResponseHeader('ETag') || '');
+        return;
+      }
+      reject(new Error(`فشل رفع الجزء إلى R2 (HTTP ${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('Network Error'));
+    xhr.ontimeout = () => reject(new Error('Network Error'));
+    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'));
+    const onAbort = () => xhr.abort();
+    if (signal) {
+      if (signal.aborted) {
+        xhr.abort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    xhr.send(blob);
+  });
+}
+
 /** أخطاء يُعاد فيها رفع الجزء (شبكة، مهلة بروكسي، إلخ) — لا يُعاد عند 422/413. */
 function shouldRetryChunkUploadError(err) {
   const status = err?.response?.status;
@@ -460,7 +495,145 @@ const CourseDetails = () => {
       const useChunked =
         needsUploadOnly && lessonFile && lessonFile.size > videoChunkBytes;
 
-      if (useChunked) {
+      if (lessonForm.video_provider === 'r2' && lessonFile) {
+        setChunkPartLabel('بدء الرفع المباشر إلى Cloudflare R2…');
+        const initiated = await videosAPI.r2Initiate({
+          course_id: course.id,
+          original_name: lessonFile.name,
+          file_size: lessonFile.size,
+        });
+        const sessionId = initiated.session_id;
+        const partSize = Number(initiated.part_size) || Math.max(5 * 1024 * 1024, videoChunkBytes);
+        const totalParts = Number(initiated.total_parts) || 1;
+        const partUrls = { ...(initiated.part_urls || {}) };
+        const etags = {};
+        chunkUploadIdRef.current = sessionId;
+
+        const lsKey = r2UploadStorageKey(course.id, lessonFile);
+        try {
+          localStorage.setItem(lsKey, JSON.stringify({ kind: 'r2', sessionId, totalParts }));
+        } catch {
+          /* ignore */
+        }
+
+        const poolAc = new AbortController();
+        chunkFlightAbortRef.current = poolAc;
+
+        let doneParts = 0;
+        const inflight = {};
+        const bump = () => {
+          let bytes = doneParts * partSize;
+          Object.values(inflight).forEach((n) => {
+            bytes += n;
+          });
+          bytes = Math.min(lessonFile.size, bytes);
+          const pct = lessonFile.size > 0 ? Math.min(99, Math.round((bytes / lessonFile.size) * 100)) : 0;
+          setUploadProgress(pct);
+          setChunkPartLabel(`رفع مباشر إلى R2… ${doneParts}/${totalParts}`);
+        };
+
+        const needPresign = [];
+        for (let p = 1; p <= totalParts; p += 1) {
+          if (!partUrls[p] && !partUrls[String(p)]) needPresign.push(p);
+        }
+        for (let i = 0; i < needPresign.length; i += 40) {
+          const batch = needPresign.slice(i, i + 40);
+          const extra = await videosAPI.r2Presign({ session_id: sessionId, part_numbers: batch });
+          Object.assign(partUrls, extra.part_urls || {});
+        }
+
+        let cursor = 1;
+        const worker = async () => {
+          while (cursor <= totalParts) {
+            while (chunkPauseRef.current && !chunkAbortRef.current) {
+              await sleepMs(200);
+            }
+            if (poolAc.signal.aborted || chunkAbortRef.current) {
+              throw new DOMException('Aborted', 'AbortError');
+            }
+            const partNumber = cursor;
+            cursor += 1;
+            const url = partUrls[partNumber] || partUrls[String(partNumber)];
+            if (!url) throw new Error(`لا يوجد رابط رفع للجزء ${partNumber}`);
+            const start = (partNumber - 1) * partSize;
+            const blob = lessonFile.slice(start, start + partSize);
+            let lastErr;
+            for (let attempt = 0; attempt < 6; attempt += 1) {
+              if (poolAc.signal.aborted || chunkAbortRef.current) {
+                throw new DOMException('Aborted', 'AbortError');
+              }
+              try {
+                const etag = await putBlobToR2(url, blob, poolAc.signal, (loaded) => {
+                  inflight[partNumber] = loaded;
+                  bump();
+                });
+                etags[partNumber] = etag;
+                delete inflight[partNumber];
+                doneParts += 1;
+                bump();
+                lastErr = null;
+                break;
+              } catch (err) {
+                lastErr = err;
+                if (err?.name === 'AbortError') throw err;
+                await sleepMs(Math.min(8000, 500 * 2 ** attempt));
+              }
+            }
+            if (lastErr) throw lastErr;
+          }
+        };
+
+        const parallel = Math.min(VIDEO_CHUNK_PARALLEL, totalParts);
+        try {
+          await Promise.all(Array.from({ length: parallel }, () => worker()));
+        } catch (err) {
+          if (isAbortLikeError(err) && chunkAbortRef.current) {
+            try {
+              await videosAPI.r2Abort({ session_id: sessionId });
+            } catch {
+              /* ignore */
+            }
+            localStorage.removeItem(lsKey);
+            throw new Error('UPLOAD_CANCELLED');
+          }
+          throw err;
+        }
+
+        if (chunkAbortRef.current) {
+          try {
+            await videosAPI.r2Abort({ session_id: sessionId });
+          } catch {
+            /* ignore */
+          }
+          localStorage.removeItem(lsKey);
+          throw new Error('UPLOAD_CANCELLED');
+        }
+
+        setChunkPartLabel('تثبيت الملف على R2 وحفظ الدرس…');
+        setUploadProgress(99);
+        const fd = new FormData();
+        fd.append('session_id', sessionId);
+        fd.append('course_id', course.id);
+        if (lessonForm.section_id) fd.append('section_id', lessonForm.section_id);
+        fd.append('title', lessonForm.title);
+        fd.append('description', lessonForm.description || '');
+        fd.append('is_free', lessonForm.is_free ? '1' : '0');
+        fd.append('order', lessonForm.order);
+        fd.append('duration', lessonForm.duration || 0);
+        fd.append('price', lessonForm.price || 0);
+        fd.append('can_download', lessonForm.can_download ? '1' : '0');
+        fd.append('can_purchase_alone', lessonForm.can_purchase_alone ? '1' : '0');
+        const partsPayload = Object.keys(etags).map((n) => ({
+          part_number: Number(n),
+          etag: etags[n],
+        }));
+        fd.append('parts', JSON.stringify(partsPayload));
+        if (lessonThumbnail) fd.append('thumbnail', lessonThumbnail);
+        await videosAPI.r2Complete(fd);
+        localStorage.removeItem(lsKey);
+        chunkUploadIdRef.current = null;
+        setUploadProgress(100);
+      } else if (useChunked) {
         const totalChunks = Math.ceil(lessonFile.size / videoChunkBytes) || 1;
         const lsKey = chunkUploadStorageKey(course.id, lessonFile);
 
@@ -750,17 +923,30 @@ const CourseDetails = () => {
   const handleDiscardChunkSession = async () => {
     if (!lessonFile || !course) return;
     const lsKey = chunkUploadStorageKey(course.id, lessonFile);
+    const r2Key = r2UploadStorageKey(course.id, lessonFile);
     let id = chunkUploadIdRef.current;
+    let r2Id = null;
     try {
       const raw = localStorage.getItem(lsKey);
       if (raw) {
         const saved = JSON.parse(raw);
         if (saved?.uploadId) id = saved.uploadId;
       }
+      const r2raw = localStorage.getItem(r2Key);
+      if (r2raw) {
+        const saved = JSON.parse(r2raw);
+        if (saved?.sessionId) r2Id = saved.sessionId;
+      }
     } catch {
       /* ignore */
     }
-    if (id) {
+    if (r2Id || (id && lessonForm.video_provider === 'r2')) {
+      try {
+        await videosAPI.r2Abort({ session_id: r2Id || id });
+      } catch {
+        /* ignore */
+      }
+    } else if (id) {
       try {
         await videosAPI.abandonChunkUpload({ upload_id: id });
       } catch {
@@ -768,6 +954,7 @@ const CourseDetails = () => {
       }
     }
     localStorage.removeItem(lsKey);
+    localStorage.removeItem(r2Key);
     chunkUploadIdRef.current = null;
     setLessonError('');
     setUploadProgress(0);

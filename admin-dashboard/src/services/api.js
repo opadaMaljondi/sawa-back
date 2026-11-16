@@ -221,12 +221,22 @@ export const videosAPI = {
       onUploadProgress,
       signal,
     }),
-  /** Merge chunks and create lesson (local / aws / r2). */
+  /** Merge chunks and create lesson (local / aws / r2 via Laravel). */
   completeChunkUpload: (formData, onUploadProgress) =>
     api.post('/admin/videos/chunk/complete', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0,
       onUploadProgress,
+    }),
+  /** Direct browser → Cloudflare R2 */
+  r2Initiate: (data) => api.post('/admin/videos/r2/initiate', data),
+  r2Presign: (data) => api.post('/admin/videos/r2/presign', data),
+  r2Status: (params) => api.get('/admin/videos/r2/status', { params }),
+  r2Abort: (params) => api.delete('/admin/videos/r2/session', { params }),
+  r2Complete: (formData) =>
+    api.post('/admin/videos/r2/complete', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
     }),
   update: (lessonId, data) => {
     if (data instanceof FormData) {

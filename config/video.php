@@ -36,4 +36,9 @@ return [
 
     'ffmpeg_binary' => env('FFMPEG_BINARY', 'ffmpeg'),
 
+    /*
+    | Direct browser → Cloudflare R2 part size (bytes). S3/R2 require ≥ 5MB except last part.
+    */
+    'r2_direct_part_kb' => (int) env('VIDEO_R2_DIRECT_PART_KB', 16384),
+
 ];

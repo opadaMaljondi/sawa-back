@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Services\CloudflareR2DirectUploadService;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use App\Jobs\FinalizeChunkedVideoUpload;
@@ -21,7 +22,8 @@ class VideoController extends Controller
 {
     public function __construct(
         protected YouTubeService $youtubeService,
-        protected LessonVideoProcessingService $lessonVideoProcessing
+        protected LessonVideoProcessingService $lessonVideoProcessing,
+        protected CloudflareR2DirectUploadService $r2Direct
     ) {}
 
     /**
@@ -510,6 +512,188 @@ class VideoController extends Controller
         $lesson->delete();
 
         return response()->json(['message' => 'Video deleted successfully']);
+    }
+
+    /**
+     * Browser → R2: start multipart (or single PUT) and return presigned URLs.
+     */
+    public function r2Initiate(Request $request): JsonResponse
+    {
+        $request->validate([
+            'course_id' => 'required|exists:courses,id',
+            'original_name' => 'required|string|max:255',
+            'file_size' => 'required|integer|min:1',
+        ]);
+
+        $maxBytes = max(1, (int) config('video.max_video_kb', 512000)) * 1024;
+        if ((int) $request->file_size > $maxBytes) {
+            return response()->json(['message' => 'Video exceeds maximum allowed size.'], 422);
+        }
+
+        $partKb = max(5120, (int) config('video.r2_direct_part_kb', 16384));
+
+        try {
+            $started = $this->r2Direct->initiate(
+                (int) $request->course_id,
+                (string) $request->original_name,
+                (int) $request->file_size,
+                $partKb * 1024
+            );
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($started);
+    }
+
+    /**
+     * Extra presigned part URLs (1-based part numbers).
+     */
+    public function r2Presign(Request $request): JsonResponse
+    {
+        $request->validate([
+            'session_id' => 'required|uuid',
+            'part_numbers' => 'required|array|min:1|max:80',
+            'part_numbers.*' => 'integer|min:1|max:10000',
+        ]);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 404);
+        }
+        if (($session['mode'] ?? '') === 'put') {
+            return response()->json(['part_urls' => []]);
+        }
+        $urls = $this->r2Direct->presignPartNumbers(
+            (string) $session['key'],
+            (string) $session['s3_upload_id'],
+            array_map('intval', $request->input('part_numbers'))
+        );
+
+        return response()->json(['part_urls' => $urls]);
+    }
+
+    public function r2Status(Request $request): JsonResponse
+    {
+        $request->validate(['session_id' => 'required|uuid']);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 404);
+        }
+        $received = $this->r2Direct->completedZeroBasedIndices($session);
+
+        return response()->json([
+            'session_id' => $request->session_id,
+            'mode' => $session['mode'] ?? 'multipart',
+            'total_parts' => $session['total_parts'] ?? 0,
+            'received_chunk_indices' => $received,
+            'all_chunks_received' => count($received) >= (int) ($session['total_parts'] ?? 0),
+        ]);
+    }
+
+    public function r2Abort(Request $request): JsonResponse
+    {
+        $request->validate(['session_id' => 'required|uuid']);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if ($session) {
+            $this->r2Direct->abort($session);
+            $this->r2Direct->forgetSession((string) $request->session_id);
+        }
+
+        return response()->json(['message' => 'تم إلغاء رفع R2.']);
+    }
+
+    /**
+     * After browser PUT parts: complete multipart on R2 and create the lesson.
+     */
+    public function r2Complete(Request $request): JsonResponse
+    {
+        if (is_string($request->input('parts'))) {
+            $decoded = json_decode((string) $request->input('parts'), true);
+            if (is_array($decoded)) {
+                $request->merge(['parts' => $decoded]);
+            }
+        }
+
+        $request->validate([
+            'session_id' => 'required|uuid',
+            'parts' => 'nullable|array',
+            'parts.*.part_number' => 'required_with:parts|integer|min:1',
+            'parts.*.etag' => 'required_with:parts|string|max:200',
+            'course_id' => 'required|exists:courses,id',
+            'section_id' => 'nullable|exists:course_sections,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'duration' => 'nullable|integer|min:0',
+            'is_free' => 'boolean',
+            'can_download' => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'order' => 'nullable|integer',
+            'thumbnail' => 'nullable|image|max:2048',
+        ]);
+
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 422);
+        }
+        if ((int) $session['course_id'] !== (int) $request->course_id) {
+            return response()->json(['message' => 'Session course mismatch.'], 422);
+        }
+
+        $parts = $request->input('parts', []);
+        if (! is_array($parts)) {
+            $parts = [];
+        }
+        if (($session['mode'] ?? '') === 'multipart') {
+            $expected = (int) ($session['total_parts'] ?? 0);
+            if (count($parts) < $expected) {
+                return response()->json([
+                    'message' => 'Not all R2 parts were uploaded.',
+                    'received' => count($parts),
+                    'expected' => $expected,
+                ], 422);
+            }
+        }
+
+        try {
+            $this->r2Direct->completeMultipart($session, $parts);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'R2 complete failed: '.$e->getMessage()], 422);
+        }
+
+        $course = Course::findOrFail($request->course_id);
+        $thumbnailPath = null;
+        if ($request->hasFile('thumbnail')) {
+            $thumbnailPath = $request->file('thumbnail')->store('thumbnails/lessons', 'public');
+        }
+
+        $lesson = Lesson::create([
+            'course_id' => $course->id,
+            'section_id' => $request->section_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'price' => $request->filled('price') ? (float) $request->price : null,
+            'duration' => $request->filled('duration') ? (int) $request->duration : 0,
+            'video_provider' => 'r2',
+            'video_reference' => $session['key'],
+            'is_free' => $request->boolean('is_free', false),
+            'can_download' => $request->boolean('can_download', true),
+            'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
+            'thumbnail' => $thumbnailPath,
+            'active' => true,
+            'order' => (int) ($request->order ?? 1),
+        ]);
+
+        $this->r2Direct->forgetSession((string) $request->session_id);
+        FullCourseContentNotifier::lessonPublished($lesson->fresh());
+        $this->maybeDispatchVideoTranscode($lesson);
+
+        return response()->json([
+            'message' => 'Video uploaded successfully to Cloudflare R2.',
+            'lesson' => $lesson,
+            'video_provider' => 'r2',
+            'video_playback_url' => $lesson->video_playback_url,
+        ], 201);
     }
 
     private function maybeDispatchVideoTranscode(Lesson $lesson): void
