@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Lesson;
+use App\Services\CloudflareR2DirectUploadService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,11 @@ class MigrateLocalVideosToR2Command extends Command
                             {--dry-run : List candidates without uploading}';
 
     protected $description = 'Copy local lesson videos to Cloudflare R2 then switch video_provider without interrupting playback';
+
+    public function __construct(protected CloudflareR2DirectUploadService $r2)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -122,7 +128,7 @@ class MigrateLocalVideosToR2Command extends Command
             return 'skip';
         }
 
-        $this->copyFileToR2($sourceKey, $abs);
+        $this->r2->uploadFromPath($sourceKey, $abs);
 
         $newVariants = [];
         $variants = is_array($lesson->video_variants) ? $lesson->video_variants : [];
@@ -137,17 +143,16 @@ class MigrateLocalVideosToR2Command extends Command
 
                 continue;
             }
-            $this->copyFileToR2($path, $vAbs);
+            $this->r2->uploadFromPath($path, $vAbs);
             $newVariants[(string) $label] = $path;
         }
 
-        if (! Storage::disk('r2')->exists($sourceKey)) {
+        $localSize = @filesize($abs);
+        $r2Size = $this->r2->objectSize($sourceKey);
+        if ($r2Size === null) {
             throw new \RuntimeException("R2 object missing after upload: {$sourceKey}");
         }
-
-        $localSize = @filesize($abs);
-        $r2Size = Storage::disk('r2')->size($sourceKey);
-        if (is_int($localSize) && $localSize > 0 && (int) $r2Size !== $localSize) {
+        if (is_int($localSize) && $localSize > 0 && $r2Size !== $localSize) {
             throw new \RuntimeException("R2 size mismatch for {$sourceKey} local={$localSize} r2={$r2Size}");
         }
 
@@ -166,35 +171,6 @@ class MigrateLocalVideosToR2Command extends Command
         }
 
         return 'ok';
-    }
-
-    private function copyFileToR2(string $key, string $absolutePath): void
-    {
-        $localSize = @filesize($absolutePath);
-        if (Storage::disk('r2')->exists($key)) {
-            try {
-                if (is_int($localSize) && $localSize > 0 && (int) Storage::disk('r2')->size($key) === $localSize) {
-                    return;
-                }
-            } catch (\Throwable) {
-                // re-upload
-            }
-        }
-
-        $stream = fopen($absolutePath, 'rb');
-        if ($stream === false) {
-            throw new \RuntimeException("Cannot read {$absolutePath}");
-        }
-        try {
-            $ok = Storage::disk('r2')->put($key, $stream);
-            if ($ok === false) {
-                throw new \RuntimeException("R2 put failed for {$key}");
-            }
-        } finally {
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-        }
     }
 
     private function localAbsolutePath(string $relative): ?string

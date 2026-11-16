@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Lesson;
+use App\Services\CloudflareR2DirectUploadService;
 use App\Support\VideoCloudDisk;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -155,6 +156,12 @@ class TranscodeLessonVideoQualities implements ShouldQueue
     {
         if ($lesson->video_provider === 'local') {
             Storage::disk('public')->put($objectPath, fopen($localFile, 'rb'));
+
+            return;
+        }
+
+        if ($lesson->video_provider === 'r2') {
+            app(CloudflareR2DirectUploadService::class)->uploadFromPath($objectPath, $localFile);
 
             return;
         }

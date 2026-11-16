@@ -78,14 +78,17 @@ class LessonVideoProcessingService
             $disk = VideoCloudDisk::diskName($videoProvider);
             $objectPath = "videos/lessons/course_{$course->id}/".Str::random(40).".{$ext}";
             try {
-                // Stream from disk to avoid loading huge files into PHP memory.
-                $stream = fopen($fullTempPath, 'rb');
-                if ($stream === false) {
-                    throw new \RuntimeException('Could not open merged temp video for cloud upload.');
-                }
-                Storage::disk($disk)->put($objectPath, $stream);
-                if (is_resource($stream)) {
-                    fclose($stream);
+                if ($videoProvider === 'r2') {
+                    app(CloudflareR2DirectUploadService::class)->uploadFromPath($objectPath, $fullTempPath);
+                } else {
+                    $stream = fopen($fullTempPath, 'rb');
+                    if ($stream === false) {
+                        throw new \RuntimeException('Could not open merged temp video for cloud upload.');
+                    }
+                    Storage::disk($disk)->put($objectPath, $stream);
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
                 }
             } catch (\Throwable $e) {
                 $label = $videoProvider === 'r2' ? 'Cloudflare R2' : 'AWS S3';

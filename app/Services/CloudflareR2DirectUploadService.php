@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Aws\Exception\MultipartUploadException;
+use Aws\S3\MultipartUploader;
 use Aws\S3\S3Client;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -51,7 +53,7 @@ class CloudflareR2DirectUploadService
             throw new \RuntimeException('R2 is not configured. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_ENDPOINT in .env then run php artisan config:clear.');
         }
 
-        return new S3Client([
+        $s3Config = [
             'version' => 'latest',
             'region' => (string) ($cfg['region'] ?? 'auto'),
             'endpoint' => $endpoint,
@@ -60,7 +62,82 @@ class CloudflareR2DirectUploadService
                 'key' => $key,
                 'secret' => $secret,
             ],
-        ]);
+        ];
+        $clientArgs = S3Client::getArguments();
+        if (isset($clientArgs['request_checksum_calculation'])) {
+            $s3Config['request_checksum_calculation'] = 'when_required';
+            $s3Config['response_checksum_validation'] = 'when_required';
+        }
+
+        return new S3Client($s3Config);
+    }
+
+    public function objectSize(string $key): ?int
+    {
+        try {
+            $res = $this->client()->headObject([
+                'Bucket' => $this->bucket(),
+                'Key' => $key,
+            ]);
+
+            return isset($res['ContentLength']) ? (int) $res['ContentLength'] : 0;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Server-side copy of a local file to R2 without Flysystem ACLs (R2 rejects ACL headers).
+     */
+    public function uploadFromPath(string $key, string $absolutePath): void
+    {
+        if (! is_file($absolutePath) || ! is_readable($absolutePath)) {
+            throw new \RuntimeException("Local video is not readable: {$absolutePath}");
+        }
+
+        $size = filesize($absolutePath);
+        $existing = $this->objectSize($key);
+        if ($existing !== null && is_int($size) && $size > 0 && $existing === $size) {
+            return;
+        }
+
+        $contentType = match (strtolower((string) pathinfo($absolutePath, PATHINFO_EXTENSION))) {
+            'mov' => 'video/quicktime',
+            'avi' => 'video/x-msvideo',
+            default => 'video/mp4',
+        };
+
+        $client = $this->client();
+        $bucket = $this->bucket();
+        $params = [
+            'ContentType' => $contentType,
+        ];
+
+        try {
+            if (is_int($size) && $size > 0 && $size < 8 * 1024 * 1024) {
+                $client->putObject([
+                    'Bucket' => $bucket,
+                    'Key' => $key,
+                    'SourceFile' => $absolutePath,
+                    'ContentType' => $contentType,
+                ]);
+
+                return;
+            }
+
+            $uploader = new MultipartUploader($client, $absolutePath, [
+                'bucket' => $bucket,
+                'key' => $key,
+                'part_size' => 16 * 1024 * 1024,
+                'concurrency' => 2,
+                'params' => $params,
+            ]);
+            $uploader->upload();
+        } catch (MultipartUploadException $e) {
+            throw new \RuntimeException('R2 multipart upload failed: '.$e->getMessage(), 0, $e);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('R2 upload failed: '.$e->getMessage(), 0, $e);
+        }
     }
 
     public function bucket(): string
