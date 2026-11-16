@@ -7,6 +7,7 @@ use App\Jobs\FinalizeChunkedVideoUpload;
 use App\Jobs\TranscodeLessonVideoQualities;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Services\CloudflareR2DirectUploadService;
 use App\Services\LessonVideoProcessingService;
 use App\Services\YouTubeService;
 use App\Support\FullCourseContentNotifier;
@@ -29,7 +30,8 @@ class VideoController extends Controller
 
     public function __construct(
         protected YouTubeService $youtubeService,
-        protected LessonVideoProcessingService $lessonVideoProcessing
+        protected LessonVideoProcessingService $lessonVideoProcessing,
+        protected CloudflareR2DirectUploadService $r2Direct
     ) {}
 
     /**
@@ -72,7 +74,7 @@ class VideoController extends Controller
             'thumbnail' => 'nullable|image|max:2048',
         ]);
 
-        $videoProvider = $request->input('video_provider', 'youtube');
+        $videoProvider = VideoCloudDisk::instructorHostedProvider($request->input('video_provider'));
 
         $tempPath = $request->file('video')->store('videos/temp', 'local');
         $fullTempPath = storage_path('app/'.$tempPath);
@@ -459,7 +461,7 @@ class VideoController extends Controller
             ], 422);
         }
 
-        $videoProvider = $request->input('video_provider');
+        $videoProvider = VideoCloudDisk::instructorHostedProvider($request->input('video_provider'));
 
         $isFree = $request->boolean('is_free', false);
         $publishInstantly = $this->instructorMayPublishLessonInstantly();
@@ -613,6 +615,215 @@ class VideoController extends Controller
             'message' => $publishInstantly ? 'Video uploaded and published successfully.' : $message,
             'lesson' => $lesson->fresh(),
             'video_provider' => $videoProvider,
+            'video_playback_url' => $lesson->video_playback_url,
+        ], 201);
+    }
+
+    public function r2Initiate(Request $request): JsonResponse
+    {
+        if (! auth()->user()->hasPermissionTo('create video')) {
+            return response()->json(['message' => 'Permission denied'], 403);
+        }
+        $request->validate([
+            'course_id' => 'required|exists:courses,id',
+            'original_name' => 'required|string|max:255',
+            'file_size' => 'required|integer|min:1',
+        ]);
+        Course::where('instructor_id', auth()->id())->findOrFail($request->course_id);
+
+        $maxBytes = max(1, (int) config('video.max_video_kb', 512000)) * 1024;
+        if ((int) $request->file_size > $maxBytes) {
+            return response()->json(['message' => 'Video exceeds maximum allowed size.'], 422);
+        }
+
+        $partKb = max(5120, (int) config('video.r2_direct_part_kb', 16384));
+        try {
+            $started = $this->r2Direct->initiate(
+                (int) $request->course_id,
+                (string) $request->original_name,
+                (int) $request->file_size,
+                $partKb * 1024
+            );
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($started);
+    }
+
+    public function r2Presign(Request $request): JsonResponse
+    {
+        $request->validate([
+            'session_id' => 'required|uuid',
+            'part_numbers' => 'required|array|min:1|max:80',
+            'part_numbers.*' => 'integer|min:1|max:10000',
+        ]);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 404);
+        }
+        if (($session['mode'] ?? '') === 'put') {
+            return response()->json(['part_urls' => []]);
+        }
+        $urls = $this->r2Direct->presignPartNumbers(
+            (string) $session['key'],
+            (string) $session['s3_upload_id'],
+            array_map('intval', $request->input('part_numbers'))
+        );
+
+        return response()->json(['part_urls' => $urls]);
+    }
+
+    public function r2Status(Request $request): JsonResponse
+    {
+        $request->validate(['session_id' => 'required|uuid']);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 404);
+        }
+        $received = $this->r2Direct->completedZeroBasedIndices($session);
+
+        return response()->json([
+            'session_id' => $request->session_id,
+            'mode' => $session['mode'] ?? 'multipart',
+            'total_parts' => $session['total_parts'] ?? 0,
+            'received_chunk_indices' => $received,
+            'all_chunks_received' => count($received) >= (int) ($session['total_parts'] ?? 0),
+        ]);
+    }
+
+    public function r2Abort(Request $request): JsonResponse
+    {
+        $request->validate(['session_id' => 'required|uuid']);
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if ($session) {
+            $this->r2Direct->abort($session);
+            $this->r2Direct->forgetSession((string) $request->session_id);
+        }
+
+        return response()->json(['message' => 'تم إلغاء رفع R2.']);
+    }
+
+    public function r2Complete(Request $request): JsonResponse
+    {
+        if (! auth()->user()->hasPermissionTo('create video')) {
+            return response()->json(['message' => 'Permission denied'], 403);
+        }
+        if ($err = $this->mergeLessonMetadataJson($request)) {
+            return $err;
+        }
+        if (is_string($request->input('parts'))) {
+            $decoded = json_decode((string) $request->input('parts'), true);
+            if (is_array($decoded)) {
+                $request->merge(['parts' => $decoded]);
+            }
+        }
+
+        $request->validate([
+            'session_id' => 'required|uuid',
+            'parts' => 'nullable|array',
+            'parts.*.part_number' => 'required_with:parts|integer|min:1',
+            'parts.*.etag' => 'required_with:parts|string|max:200',
+            'course_id' => 'required|exists:courses,id',
+            'title' => 'required|string|max:255',
+            'is_free' => 'boolean',
+            'can_download' => 'boolean',
+            'can_purchase_alone' => 'boolean',
+            'order' => 'nullable|integer',
+            'metadata' => 'nullable|string|max:65535',
+        ]);
+
+        $course = Course::where('instructor_id', auth()->id())->findOrFail($request->course_id);
+        $request->validate([
+            'section_id' => [
+                'required',
+                Rule::exists('course_sections', 'id')->where(fn ($q) => $q->where('course_id', $course->id)),
+            ],
+            'description' => 'nullable|string',
+            'duration' => 'required|integer|min:1|max:864000',
+            'price' => 'nullable|numeric|min:0',
+            'thumbnail' => 'nullable|image|max:2048',
+        ]);
+
+        $session = $this->r2Direct->getSession((string) $request->session_id);
+        if (! $session) {
+            return response()->json(['message' => 'R2 upload session not found or expired.'], 422);
+        }
+        if ((int) $session['course_id'] !== (int) $course->id) {
+            return response()->json(['message' => 'Session course mismatch.'], 422);
+        }
+
+        $parts = $request->input('parts', []);
+        if (! is_array($parts)) {
+            $parts = [];
+        }
+        if (($session['mode'] ?? '') === 'multipart') {
+            $expected = (int) ($session['total_parts'] ?? 0);
+            if (count($parts) < $expected) {
+                return response()->json([
+                    'message' => 'Not all R2 parts were uploaded.',
+                    'received' => count($parts),
+                    'expected' => $expected,
+                ], 422);
+            }
+        }
+
+        try {
+            $this->r2Direct->completeMultipart($session, $parts);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'R2 complete failed: '.$e->getMessage()], 422);
+        }
+
+        $isFree = $request->boolean('is_free', false);
+        $publishInstantly = $this->instructorMayPublishLessonInstantly();
+        $thumbnailPath = $this->storeLessonThumbnail($request, $course);
+
+        $lesson = Lesson::create([
+            'course_id' => $course->id,
+            'section_id' => $request->section_id,
+            'title' => $request->title,
+            'description' => $this->normalizedLessonDescription($request),
+            'duration' => (int) $request->duration,
+            'thumbnail' => $thumbnailPath,
+            'price' => $this->resolvedLessonPrice($request, $isFree),
+            'video_provider' => 'r2',
+            'video_reference' => $session['key'],
+            'is_free' => $isFree,
+            'can_download' => $request->boolean('can_download', true),
+            'can_purchase_alone' => $this->resolvedCanPurchaseAlone($request, $course),
+            'approval_status' => $publishInstantly ? 'approved' : 'pending',
+            'active' => $publishInstantly,
+            'order' => (int) ($request->order ?? 1),
+        ]);
+
+        $this->r2Direct->forgetSession((string) $request->session_id);
+
+        if ($publishInstantly) {
+            FullCourseContentNotifier::lessonPublished($lesson->fresh());
+            InstructorAdminNotifier::notify(
+                $course,
+                'تم نشر درس فيديو (R2) فوراً (لا يوجد انتظار موافقة إدارية)',
+                'إطلاع أمني: درس تم نشره',
+                [
+                    'type' => 'instructor_lesson_auto_published',
+                    'lesson_id' => $lesson->id,
+                ]
+            );
+        } else {
+            InstructorAdminNotifier::notify($course, 'تم رفع درس (R2) يحتاج مراجعة', null, [
+                'type' => 'instructor_lesson_pending',
+                'lesson_id' => $lesson->id,
+            ]);
+        }
+
+        $this->maybeDispatchVideoTranscode($lesson);
+
+        return response()->json([
+            'message' => $publishInstantly
+                ? 'Video uploaded and published successfully.'
+                : 'Video uploaded to Cloudflare R2. Waiting for admin approval.',
+            'lesson' => $lesson->fresh(),
+            'video_provider' => 'r2',
             'video_playback_url' => $lesson->video_playback_url,
         ], 201);
     }

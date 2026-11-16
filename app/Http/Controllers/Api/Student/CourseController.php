@@ -264,6 +264,8 @@ class CourseController extends Controller
                     'video_provider' => $lesson->video_provider,
                     // Only expose playback URL if student has access
                     'video_playback_url' => $lessonAccessible ? $lesson->video_playback_url : null,
+                    'available_qualities' => $lessonAccessible ? $lesson->availableQualityLabels() : [],
+                    'video_quality_urls' => $lessonAccessible ? $lesson->video_quality_urls : [],
                 ];
             });
 

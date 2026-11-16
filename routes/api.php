@@ -129,6 +129,7 @@ Route::middleware(['auth:sanctum', 'student'])->prefix('student')->group(functio
 
     // Video Downloads (chunk-friendly GET file: local = Range-capable binary; aws = JSON with signed URL)
     Route::get('videos/downloaded', [VideoDownloadController::class, 'downloaded']);
+    Route::get('videos/{lessonId}/playback', [VideoDownloadController::class, 'playback'])->whereNumber('lessonId');
     Route::get('videos/{lessonId}/file', [VideoDownloadController::class, 'streamLessonFile'])->whereNumber('lessonId');
     Route::post('videos/{lessonId}/download', [VideoDownloadController::class, 'download']);
     Route::get('videos/{token}/stream', [VideoDownloadController::class, 'stream']);
@@ -232,6 +233,11 @@ Route::middleware(['auth:sanctum', 'instructor'])->prefix('instructor')->group(f
     Route::delete('videos/chunk/session', [VideoController::class, 'abandonChunkUpload']);
     Route::post('videos/chunk', [VideoController::class, 'uploadChunk']);
     Route::post('videos/chunk/complete', [VideoController::class, 'completeChunkUpload']);
+    Route::post('videos/r2/initiate', [VideoController::class, 'r2Initiate']);
+    Route::post('videos/r2/presign', [VideoController::class, 'r2Presign']);
+    Route::get('videos/r2/status', [VideoController::class, 'r2Status']);
+    Route::delete('videos/r2/session', [VideoController::class, 'r2Abort']);
+    Route::post('videos/r2/complete', [VideoController::class, 'r2Complete']);
     Route::post('videos', [VideoController::class, 'upload']);
     Route::put('videos/{lessonId}', [VideoController::class, 'update']);
     Route::delete('videos/{lessonId}', [VideoController::class, 'destroy']);

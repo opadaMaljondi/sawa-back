@@ -43,6 +43,8 @@ class VideoDownloadController extends Controller
             return response()->json(['message' => 'Video not available'], 404);
         }
 
+        $quality = (string) $request->input('quality', 'source');
+
         if ($lesson->video_provider === 'youtube') {
             return response()->json([
                 'message'        => 'This lesson is hosted on YouTube. Use playback_url in your player; offline file packaging is only for hosted videos (local/S3/R2).',
@@ -50,21 +52,77 @@ class VideoDownloadController extends Controller
                 'playback_url'   => YouTubeService::playbackUrl((string) $lesson->video_reference),
                 'embed_url'      => YouTubeService::embedUrl((string) $lesson->video_reference),
                 'download_available' => false,
+                'ready' => true,
+                'status' => 'completed',
+            ]);
+        }
+
+        // Cloud: never pull/encrypt on PHP (that froze the student app on "preparing").
+        if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
+            $objectKey = $lesson->storedPathForQuality($quality);
+            $url = $this->signedCloudUrl($lesson, $objectKey);
+            if (! $url) {
+                return response()->json(['message' => 'Could not generate download URL'], 500);
+            }
+
+            $token = Str::random(64);
+            $fileSize = 0;
+            try {
+                $fileSize = (int) Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->size($objectKey);
+            } catch (\Throwable) {
+                $fileSize = 0;
+            }
+
+            DownloadedLesson::updateOrCreate(
+                [
+                    'student_id' => $student->id,
+                    'lesson_id'  => $lessonId,
+                    'device_id'  => null,
+                ],
+                [
+                    'encrypted_path'  => '',
+                    'token'           => $token,
+                    'encryption_key'  => '',
+                    'quality'         => $quality !== '' ? $quality : 'source',
+                    'file_size'       => $fileSize,
+                    'status'          => 'completed',
+                    'downloaded_at'   => now(),
+                ]
+            );
+
+            $signature = $this->encryptionService->generateDownloadSignature(
+                $token,
+                (int) $lessonId,
+                (int) $student->id
+            );
+
+            return response()->json([
+                'message' => 'Download ready',
+                'ready' => true,
+                'status' => 'completed',
+                'preparing' => false,
+                'download_mode' => 'direct',
+                'token' => $token,
+                'signature' => $signature,
+                'stream_url' => $url,
+                'download_url' => $url,
+                'video_provider' => $lesson->video_provider,
+                'quality' => $quality !== '' ? $quality : 'source',
+                'quality_urls' => $lesson->video_quality_urls,
+                'file_size' => $fileSize,
+                'supports_http_range' => true,
+                'expires_in_minutes' => 120,
             ]);
         }
 
         $encryptedPath = storage_path('app/videos/encrypted/'.$student->id.'/'.$lessonId.'.enc');
-        $sourcePath    = $this->resolveSourceFileForEncryption($lesson);
+        $sourcePath    = $this->resolveSourceFileForEncryption($lesson, $quality);
 
         if (! $sourcePath) {
             return response()->json(['message' => 'Video file not found on server'], 404);
         }
 
         $encryptionData = $this->encryptionService->encryptVideo($sourcePath, $encryptedPath);
-
-        if (VideoCloudDisk::isCloudProvider($lesson->video_provider) && str_starts_with($sourcePath, storage_path('app/videos/temp'))) {
-            @unlink($sourcePath);
-        }
 
         DownloadedLesson::updateOrCreate(
             [
@@ -76,7 +134,7 @@ class VideoDownloadController extends Controller
                 'encrypted_path'  => $encryptedPath,
                 'token'           => $encryptionData['token'],
                 'encryption_key'  => $encryptionData['decryption_key'],
-                'quality'         => '360p',
+                'quality'         => $quality !== '' ? $quality : 'source',
                 'file_size'       => $encryptionData['file_size'],
                 'status'          => 'completed',
                 'downloaded_at'   => now(),
@@ -91,8 +149,44 @@ class VideoDownloadController extends Controller
 
         return response()->json([
             'message'   => 'Video downloaded successfully',
+            'ready' => true,
+            'status' => 'completed',
+            'preparing' => false,
+            'download_mode' => 'encrypted',
             'token'     => $encryptionData['token'],
             'signature' => $signature,
+            'file_size' => $encryptionData['file_size'],
+        ]);
+    }
+
+    /**
+     * Playback URLs for the in-app player, including quality variants when transcoded.
+     */
+    public function playback(Request $request, $lessonId)
+    {
+        $lesson = Lesson::findOrFail($lessonId);
+        $student = auth()->user();
+
+        if ($lesson->approval_status !== 'approved' || ! $lesson->active) {
+            return response()->json(['message' => 'Lesson not available.'], 404);
+        }
+
+        if (! $student->hasAccessToLesson((int) $lessonId)) {
+            return response()->json(['message' => 'Access denied'], 403);
+        }
+
+        $quality = (string) $request->query('quality', 'source');
+        $selectedPath = $lesson->storedPathForQuality($quality);
+        $selectedUrl = $selectedPath ? $lesson->urlForStoredVideoPath($selectedPath) : $lesson->video_playback_url;
+
+        return response()->json([
+            'lesson_id' => $lesson->id,
+            'video_provider' => $lesson->video_provider,
+            'quality' => $quality !== '' ? $quality : 'source',
+            'video_playback_url' => $selectedUrl,
+            'available_qualities' => $lesson->availableQualityLabels(),
+            'video_quality_urls' => $lesson->video_quality_urls,
+            'can_change_quality' => count($lesson->availableQualityLabels()) > 1,
         ]);
     }
 
@@ -132,8 +226,11 @@ class VideoDownloadController extends Controller
             ], 422);
         }
 
+        $quality = (string) $request->query('quality', 'source');
+        $objectKey = $lesson->storedPathForQuality($quality);
+
         if ($lesson->video_provider === 'local') {
-            $absolute = $this->resolveLocalVideoAbsolutePath($lesson);
+            $absolute = $this->resolveLocalVideoAbsolutePath($lesson, $objectKey);
             if (! $absolute || ! is_readable($absolute)) {
                 return response()->json(['message' => 'Video file not found'], 404);
             }
@@ -146,29 +243,28 @@ class VideoDownloadController extends Controller
         }
 
         if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
-            try {
-                $disk = VideoCloudDisk::diskName($lesson->video_provider);
-                $url = Storage::disk($disk)->temporaryUrl(
-                    $lesson->video_reference,
-                    now()->addMinutes(120),
-                    [
-                        'ResponseContentType' => 'video/mp4',
-                    ]
-                );
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'message' => 'Could not generate download URL: '.$e->getMessage(),
-                ], 500);
+            $url = $this->signedCloudUrl($lesson, $objectKey);
+            if (! $url) {
+                return response()->json(['message' => 'Could not generate download URL'], 500);
             }
 
-            return response()->json([
-                'message'              => 'Use stream_url with Range requests for chunked download.',
-                'video_provider'       => $lesson->video_provider,
-                'stream_url'           => $url,
-                'supports_http_range'  => true,
-                'expires_in_minutes'   => 120,
-                'quality_urls'         => $lesson->video_quality_urls,
-            ]);
+            if ($request->query('format') === 'json') {
+                return response()->json([
+                    'message'              => 'Use stream_url with Range requests for chunked download.',
+                    'ready'                => true,
+                    'status'               => 'completed',
+                    'preparing'            => false,
+                    'video_provider'       => $lesson->video_provider,
+                    'stream_url'           => $url,
+                    'download_url'         => $url,
+                    'supports_http_range'  => true,
+                    'expires_in_minutes'   => 120,
+                    'quality'              => $quality !== '' ? $quality : 'source',
+                    'quality_urls'         => $lesson->video_quality_urls,
+                ]);
+            }
+
+            return redirect()->away($url);
         }
 
         return response()->json(['message' => 'Unsupported video provider'], 422);
@@ -177,10 +273,28 @@ class VideoDownloadController extends Controller
     /**
      * Absolute path to a local video file for this lesson, or temp path after pulling from S3.
      */
-    protected function resolveSourceFileForEncryption(Lesson $lesson): ?string
+    protected function signedCloudUrl(Lesson $lesson, ?string $objectKey): ?string
+    {
+        if (! $objectKey || ! VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
+            return null;
+        }
+        try {
+            return Storage::disk(VideoCloudDisk::diskName($lesson->video_provider))->temporaryUrl(
+                $objectKey,
+                now()->addMinutes(120),
+                [
+                    'ResponseContentType' => 'video/mp4',
+                ]
+            );
+        } catch (\Throwable) {
+            return $lesson->urlForStoredVideoPath($objectKey);
+        }
+    }
+
+    protected function resolveSourceFileForEncryption(Lesson $lesson, ?string $quality = null): ?string
     {
         if ($lesson->video_provider === 'local') {
-            return $this->resolveLocalVideoAbsolutePath($lesson);
+            return $this->resolveLocalVideoAbsolutePath($lesson, $lesson->storedPathForQuality($quality));
         }
 
         if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
@@ -216,16 +330,17 @@ class VideoDownloadController extends Controller
         return null;
     }
 
-    protected function resolveLocalVideoAbsolutePath(Lesson $lesson): ?string
+    protected function resolveLocalVideoAbsolutePath(Lesson $lesson, ?string $relative = null): ?string
     {
-        if ($lesson->video_provider !== 'local' || empty($lesson->video_reference)) {
+        $relative = $relative ?: $lesson->video_reference;
+        if ($lesson->video_provider !== 'local' || empty($relative)) {
             return null;
         }
-        if (Storage::disk('public')->exists($lesson->video_reference)) {
-            return Storage::disk('public')->path($lesson->video_reference);
+        if (Storage::disk('public')->exists($relative)) {
+            return Storage::disk('public')->path($relative);
         }
-        if (Storage::disk('local')->exists($lesson->video_reference)) {
-            return Storage::disk('local')->path($lesson->video_reference);
+        if (Storage::disk('local')->exists($relative)) {
+            return Storage::disk('local')->path($relative);
         }
 
         return null;
@@ -307,6 +422,27 @@ class VideoDownloadController extends Controller
             )) {
                 return response()->json(['message' => 'Invalid signature'], 403);
             }
+        }
+
+        if (! is_string($downloaded->encrypted_path) || ! is_file($downloaded->encrypted_path)) {
+            $quality = (string) ($downloaded->quality ?: 'source');
+            $objectKey = $lesson->storedPathForQuality($quality);
+            if (VideoCloudDisk::isCloudProvider($lesson->video_provider)) {
+                $url = $this->signedCloudUrl($lesson, $objectKey);
+                if ($url) {
+                    return redirect()->away($url);
+                }
+            }
+            if ($lesson->video_provider === 'local') {
+                $absolute = $this->resolveLocalVideoAbsolutePath($lesson, $objectKey);
+                if ($absolute && is_readable($absolute)) {
+                    return response()->file($absolute, [
+                        'Content-Type' => mime_content_type($absolute) ?: 'video/mp4',
+                    ]);
+                }
+            }
+
+            return response()->json(['message' => 'Download file not found'], 404);
         }
 
         $tempOutput = storage_path('app/videos/temp/'.uniqid('stream_', true).'.mp4');

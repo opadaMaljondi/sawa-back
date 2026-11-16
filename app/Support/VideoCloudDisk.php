@@ -28,4 +28,16 @@ final class VideoCloudDisk
             default => throw new \InvalidArgumentException("Provider [{$provider}] is not a cloud disk."),
         };
     }
+
+    /**
+     * Instructor file uploads always go to R2 (YouTube URL lessons stay YouTube).
+     */
+    public static function instructorHostedProvider(?string $requested): string
+    {
+        if ($requested === 'youtube') {
+            return 'youtube';
+        }
+
+        return 'r2';
+    }
 }

@@ -140,6 +140,46 @@ class Lesson extends Model
         return $out;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function availableQualityLabels(): array
+    {
+        $labels = ['source'];
+        $variants = is_array($this->video_variants) ? $this->video_variants : [];
+        foreach ($variants as $label => $path) {
+            if (is_string($path) && $path !== '') {
+                $labels[] = (string) $label;
+            }
+        }
+
+        return array_values(array_unique($labels));
+    }
+
+    public function storedPathForQuality(?string $quality): ?string
+    {
+        if (empty($this->video_reference)) {
+            return null;
+        }
+        $want = strtolower(trim((string) $quality));
+        if ($want === '' || $want === 'source' || $want === 'auto' || $want === 'original') {
+            return $this->video_reference;
+        }
+
+        $variants = is_array($this->video_variants) ? $this->video_variants : [];
+        foreach ($variants as $label => $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+            $key = strtolower((string) $label);
+            if ($key === $want || $key === $want.'p' || $want === $key.'p') {
+                return $path;
+            }
+        }
+
+        return $this->video_reference;
+    }
+
     public function urlForStoredVideoPath(string $path): ?string
     {
         if ($this->video_provider === 'local') {

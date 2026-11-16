@@ -32,9 +32,16 @@ class AppInfoController extends Controller
     {
         $maxKb = max(1024, (int) config('video.chunk_max_kb', 32768));
 
+        $r2PartKb = max(5120, (int) config('video.r2_direct_part_kb', 16384));
+
         return response()->json([
             'chunk_max_kb'    => $maxKb,
             'chunk_max_bytes' => $maxKb * 1024,
+            'default_video_provider' => 'r2',
+            'instructor_file_provider' => 'r2',
+            'r2_direct' => true,
+            'r2_direct_part_kb' => $r2PartKb,
+            'r2_direct_part_bytes' => $r2PartKb * 1024,
         ]);
     }
 

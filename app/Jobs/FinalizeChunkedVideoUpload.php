@@ -40,8 +40,11 @@ class FinalizeChunkedVideoUpload implements ShouldQueue
         $uploadId = (string) ($state['upload_id'] ?? '');
         $total = (int) ($state['total_chunks'] ?? 0);
         $ext = (string) ($state['extension'] ?? 'mp4');
-        $videoProvider = (string) ($state['video_provider'] ?? 'local');
         $context = (string) ($state['context'] ?? 'admin');
+        $videoProvider = (string) ($state['video_provider'] ?? 'local');
+        if ($context === 'instructor' && $videoProvider !== 'youtube') {
+            $videoProvider = 'r2';
+        }
         $lessonRow = $state['lesson_row'] ?? null;
         $thumbRel = isset($state['thumbnail_local_relative']) ? (string) $state['thumbnail_local_relative'] : null;
 
