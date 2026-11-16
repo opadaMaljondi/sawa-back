@@ -18,7 +18,8 @@ class CourseController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Course::with(['instructor', 'subject', 'sections.lessons']);
+        $query = Course::with(['instructor', 'subject'])
+            ->withCount(['sections', 'enrollments', 'lessonsThroughSections as lessons_count']);
 
         if ($request->filled('keyword')) {
             $k = $request->keyword;

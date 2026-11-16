@@ -219,7 +219,7 @@ const CoursesList = () => {
                                             <td>
                                                 <div className="flex items-center gap-1">
                                                     <Video size={14} />
-                                                    <span>{course.sections?.reduce((sum, s) => sum + (s.lessons?.length || 0), 0) ?? '-'}</span>
+                                                    <span>{course.lessons_count ?? '-'}</span>
                                                 </div>
                                             </td>
                                             <td className="text-gray-600 text-sm whitespace-nowrap">

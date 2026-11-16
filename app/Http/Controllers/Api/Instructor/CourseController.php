@@ -25,7 +25,7 @@ class CourseController extends Controller
     public function index()
     {
         $courses = Course::where('instructor_id', auth()->id())
-            ->with(['subject.department', 'subject.year', 'subject.semester', 'sections.lessons'])
+            ->with(['subject.department', 'subject.year', 'subject.semester'])
             ->withCount([
                 'sections',
                 'lessonsThroughSections as lessons_count',

@@ -46,6 +46,9 @@ class Lesson extends Model
 
     protected $appends = ['video_playback_url', 'video_embed_url', 'thumbnail_url', 'video_quality_urls'];
 
+    /** @var array{0: bool, 1: ?string} */
+    private array $playbackUrlMemo = [false, null];
+
     /** الدروس الظاهرة للطالب (موافق عليها من الأدمن). */
     public function scopeApprovedForStudents($query)
     {
@@ -62,16 +65,25 @@ class Lesson extends Model
      */
     public function getVideoPlaybackUrlAttribute(): ?string
     {
+        if ($this->playbackUrlMemo[0]) {
+            return $this->playbackUrlMemo[1];
+        }
+
+        $url = $this->resolveVideoPlaybackUrl();
+        $this->playbackUrlMemo = [true, $url];
+
+        return $url;
+    }
+
+    private function resolveVideoPlaybackUrl(): ?string
+    {
         if (empty($this->video_reference)) {
             return null;
         }
 
         if ($this->video_provider === 'local') {
-            return Storage::disk('public')->exists($this->video_reference) 
-                ? Storage::disk('public')->url($this->video_reference)
-                : (Storage::disk('local')->exists($this->video_reference) 
-                    ? asset('storage/' . $this->video_reference) // Assuming linked
-                    : null);
+            // Avoid disk exists() on every JSON serialize (course lists).
+            return Storage::disk('public')->url($this->video_reference);
         }
 
         if (VideoCloudDisk::isCloudProvider($this->video_provider)) {
@@ -109,8 +121,12 @@ class Lesson extends Model
      */
     public function getVideoQualityUrlsAttribute(): array
     {
-        $out = [];
         $variants = is_array($this->video_variants) ? $this->video_variants : [];
+        if ($variants === []) {
+            return [];
+        }
+
+        $out = [];
         foreach ($variants as $label => $path) {
             if (! is_string($path) || $path === '') {
                 continue;
@@ -127,9 +143,7 @@ class Lesson extends Model
     public function urlForStoredVideoPath(string $path): ?string
     {
         if ($this->video_provider === 'local') {
-            return Storage::disk('public')->exists($path)
-                ? Storage::disk('public')->url($path)
-                : null;
+            return Storage::disk('public')->url($path);
         }
 
         if (VideoCloudDisk::isCloudProvider($this->video_provider)) {
