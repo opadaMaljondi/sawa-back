@@ -329,6 +329,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('videos/r2/session', [AdminVideoController::class, 'r2Abort']);
     Route::post('videos/r2/complete', [AdminVideoController::class, 'r2Complete']);
     Route::post('videos', [AdminVideoController::class, 'upload']);
+    Route::get('videos/{lessonId}', [AdminVideoController::class, 'show'])->whereNumber('lessonId');
     Route::put('videos/{lessonId}', [AdminVideoController::class, 'update']);
     Route::delete('videos/{lessonId}', [AdminVideoController::class, 'destroy']);
     Route::post('courses/{courseId}/make-first-free', [AdminVideoController::class, 'makeFirstFree']);

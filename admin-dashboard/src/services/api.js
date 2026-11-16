@@ -238,6 +238,7 @@ export const videosAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0,
     }),
+  get: (lessonId) => api.get(`/admin/videos/${lessonId}`),
   update: (lessonId, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');

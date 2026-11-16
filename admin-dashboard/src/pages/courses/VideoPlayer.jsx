@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { coursesAPI } from '../../services/api';
+import { videosAPI } from '../../services/api';
 
 const VideoPlayer = () => {
   const { t } = useTranslation();
@@ -18,17 +18,12 @@ const VideoPlayer = () => {
       try {
         setLoading(true);
         setError('');
-        const data = await coursesAPI.getById(courseId);
-        setCourse(data);
-
-        const allLessons =
-          (data.sections || []).reduce(
-            (acc, sec) => acc.concat(sec.lessons || []),
-            [],
-          ) || [];
-
-        const found = allLessons.find((l) => String(l.id) === String(lessonId));
-        if (!found) {
+        const data = await videosAPI.get(lessonId);
+        const found = data.lesson || data;
+        if (data.course) {
+          setCourse(data.course);
+        }
+        if (!found?.id) {
           setError('لم يتم العثور على هذا الدرس داخل الكورس');
         } else {
           setLesson(found);

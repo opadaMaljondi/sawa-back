@@ -308,15 +308,23 @@ class CourseController extends Controller
     public function show($courseId)
     {
         $course = Course::with([
-            'instructor',
-            'subject.department',
-            'subject.year',
-            'subject.semester',
-            'sections.lessons',
-            'enrollments.student',
-            'notes',
-            'exams',
-        ])->findOrFail($courseId);
+            'instructor:id,full_name,email,image,type',
+            'subject:id,name,department_id,year_id,semester_id',
+            'subject.department:id,name',
+            'subject.year:id,name',
+            'subject.semester:id,name',
+            'sections' => fn ($q) => $q->orderBy('order'),
+            'sections.lessons' => fn ($q) => $q->orderBy('order'),
+        ])
+            ->withCount('enrollments')
+            ->findOrFail($courseId);
+
+        // Course details UI does not play videos; skip signed R2/S3 URLs (very slow per lesson).
+        $course->sections->each(function ($section) {
+            $section->lessons->each(function ($lesson) {
+                $lesson->makeHidden(['video_playback_url', 'video_embed_url', 'video_quality_urls']);
+            });
+        });
 
         return response()->json($course);
     }

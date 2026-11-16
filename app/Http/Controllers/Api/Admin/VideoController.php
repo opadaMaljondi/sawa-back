@@ -410,6 +410,19 @@ class VideoController extends Controller
     }
 
     /**
+     * Single lesson with playback URLs (used by admin video player).
+     */
+    public function show($lessonId): JsonResponse
+    {
+        $lesson = Lesson::with(['course:id,title'])->findOrFail($lessonId);
+
+        return response()->json([
+            'lesson' => $lesson,
+            'course' => $lesson->course,
+        ]);
+    }
+
+    /**
      * Update video (any lesson) – including approval_status (pending, approved, rejected).
      */
     public function update(Request $request, $lessonId)
