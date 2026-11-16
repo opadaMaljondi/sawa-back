@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Aws\S3\S3Client;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -41,20 +40,27 @@ class CloudflareR2DirectUploadService
 
     public function client(): S3Client
     {
-        $disk = Storage::disk('r2');
-        if (! method_exists($disk, 'getAdapter')) {
-            throw new \RuntimeException('R2 disk adapter is unavailable.');
+        $cfg = config('filesystems.disks.r2', []);
+        $key = trim((string) ($cfg['key'] ?? ''));
+        $secret = trim((string) ($cfg['secret'] ?? ''));
+        $endpoint = rtrim(trim((string) ($cfg['endpoint'] ?? '')), '/');
+        if (str_ends_with($endpoint, '/'.(string) ($cfg['bucket'] ?? ''))) {
+            $endpoint = substr($endpoint, 0, -strlen('/'.(string) $cfg['bucket']));
         }
-        $adapter = $disk->getAdapter();
-        if (! is_object($adapter) || ! method_exists($adapter, 'getClient')) {
-            throw new \RuntimeException('R2 is not configured as an S3-compatible disk. Check R2_ENDPOINT and keys.');
-        }
-        $client = $adapter->getClient();
-        if (! $client instanceof S3Client) {
-            throw new \RuntimeException('R2 S3 client missing.');
+        if ($key === '' || $secret === '' || $endpoint === '') {
+            throw new \RuntimeException('R2 is not configured. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_ENDPOINT in .env then run php artisan config:clear.');
         }
 
-        return $client;
+        return new S3Client([
+            'version' => 'latest',
+            'region' => (string) ($cfg['region'] ?? 'auto'),
+            'endpoint' => $endpoint,
+            'use_path_style_endpoint' => (bool) ($cfg['use_path_style_endpoint'] ?? false),
+            'credentials' => [
+                'key' => $key,
+                'secret' => $secret,
+            ],
+        ]);
     }
 
     public function bucket(): string
