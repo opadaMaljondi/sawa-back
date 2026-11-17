@@ -317,25 +317,25 @@ class CourseController extends Controller
             ];
         }
 
-        // ----- Exams — only for full-course enrolled students -----
+        // ----- Exams: listed for everyone, file only after purchase or a free course -----
+        $examsOpen = $hasFullCourse || (float) ($course->price ?? 0) <= 0;
         $exams = [];
-        if ($hasFullCourse) {
-            foreach ($course->exams as $exam) {
-                $fileUrl = null;
-                if ($exam->attachment) {
-                    $fileUrl = filter_var($exam->attachment, FILTER_VALIDATE_URL)
-                        ? $exam->attachment
-                        : Storage::disk('public')->url($exam->attachment);
-                }
-                $exams[] = [
-                    'id' => $exam->id,
-                    'title' => $exam->title,
-                    'description' => $exam->description,
-                    'attachment_url' => $fileUrl,
-                    'available_from' => $exam->available_from?->toDateTimeString(),
-                    'available_until' => $exam->available_until?->toDateTimeString(),
-                ];
+        foreach ($course->exams as $exam) {
+            $fileUrl = null;
+            if ($examsOpen && $exam->attachment) {
+                $fileUrl = filter_var($exam->attachment, FILTER_VALIDATE_URL)
+                    ? $exam->attachment
+                    : Storage::disk('public')->url($exam->attachment);
             }
+            $exams[] = [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'description' => $exam->description,
+                'attachment_url' => $fileUrl,
+                'is_accessible' => $examsOpen,
+                'available_from' => $exam->available_from?->toDateTimeString(),
+                'available_until' => $exam->available_until?->toDateTimeString(),
+            ];
         }
 
         return response()->json([
@@ -390,15 +390,25 @@ class CourseController extends Controller
                 'lessonsThroughSections' => fn ($q) => $q->approvedForStudents(),
             ], 'duration');
 
-        if ($request->has('keyword')) {
+        if ($request->filled('keyword')) {
             $query->where('title', 'like', '%'.$request->keyword.'%');
         }
 
-        if ($request->has('department_id')) {
-            $query->whereHas('subject', fn ($q) => $q->where('department_id', $request->department_id));
+        if ($request->filled('department_id') || $request->filled('year_id') || $request->filled('semester_id')) {
+            $query->whereHas('subject', function ($q) use ($request) {
+                if ($request->filled('department_id')) {
+                    $q->where('department_id', $request->department_id);
+                }
+                if ($request->filled('year_id')) {
+                    $q->where('year_id', $request->year_id);
+                }
+                if ($request->filled('semester_id')) {
+                    $q->where('semester_id', $request->semester_id);
+                }
+            });
         }
 
-        if ($request->has('subject_id')) {
+        if ($request->filled('subject_id')) {
             $query->where('subject_id', $request->subject_id);
         }
 
