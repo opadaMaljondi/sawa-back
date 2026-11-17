@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\Lesson;
 use App\Models\User;
 use App\Services\CourseCommissionService;
 use App\Services\NotificationService;
@@ -47,7 +48,35 @@ class CourseController extends Controller
             $query->where('active', $request->boolean('active'));
         }
 
-        return response()->json($query->latest()->paginate(20));
+        $paginator = $query->latest()->paginate(20);
+        $ids = $paginator->getCollection()->pluck('id')->filter()->values();
+        $videosByCourse = [];
+        if ($ids->isNotEmpty()) {
+            Lesson::query()
+                ->whereIn('course_id', $ids)
+                ->get(['id', 'course_id'])
+                ->each(function (Lesson $lesson) use (&$videosByCourse) {
+                    $videosByCourse[(int) $lesson->course_id][(int) $lesson->id] = true;
+                });
+
+            Lesson::query()
+                ->join('course_sections', 'course_sections.id', '=', 'lessons.section_id')
+                ->whereIn('course_sections.course_id', $ids)
+                ->get(['lessons.id as id', 'course_sections.course_id as course_id'])
+                ->each(function ($lesson) use (&$videosByCourse) {
+                    $videosByCourse[(int) $lesson->course_id][(int) $lesson->id] = true;
+                });
+        }
+
+        $paginator->getCollection()->transform(function (Course $course) use ($videosByCourse) {
+            $count = count($videosByCourse[(int) $course->id] ?? []);
+            $course->setAttribute('lessons_count', $count);
+            $course->setAttribute('videos_count', $count);
+
+            return $course;
+        });
+
+        return response()->json($paginator);
     }
 
     /**

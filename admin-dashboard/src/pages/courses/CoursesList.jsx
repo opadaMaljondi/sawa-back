@@ -219,7 +219,7 @@ const CoursesList = () => {
                                             <td>
                                                 <div className="flex items-center gap-1">
                                                     <Video size={14} />
-                                                    <span>{course.lessons_count ?? '-'}</span>
+                                                    <span>{Number(course.lessons_count ?? course.videos_count ?? 0)}</span>
                                                 </div>
                                             </td>
                                             <td className="text-gray-600 text-sm whitespace-nowrap">
