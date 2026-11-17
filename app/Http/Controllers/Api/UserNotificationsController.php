@@ -11,6 +11,7 @@ class UserNotificationsController extends Controller
     public function index(Request $request)
     {
         $perPage = min(100, max(5, (int) $request->query('per_page', 20)));
+        $this->collapseDuplicateCourseApprovals((int) auth()->id());
 
         return response()->json(
             UserNotification::where('user_id', auth()->id())
@@ -21,6 +22,7 @@ class UserNotificationsController extends Controller
 
     public function unreadCount()
     {
+        $this->collapseDuplicateCourseApprovals((int) auth()->id());
         $count = UserNotification::where('user_id', auth()->id())
             ->where('read', false)
             ->count();
@@ -56,5 +58,28 @@ class UserNotificationsController extends Controller
             'message' => 'All notifications marked as read.',
             'updated_count' => $updated,
         ]);
+    }
+
+    /**
+     * Approval used to be sent again every time an already published course was approved.
+     * Keep one notice per course.
+     */
+    private function collapseDuplicateCourseApprovals(int $userId): void
+    {
+        $rows = UserNotification::query()
+            ->where('user_id', $userId)
+            ->where('title', 'تم قبول كورسك')
+            ->orderByDesc('id')
+            ->get();
+
+        $seen = [];
+        foreach ($rows as $row) {
+            $courseId = (string) (data_get($row->data, 'course_id') ?? ('row-'.$row->id));
+            if (isset($seen[$courseId])) {
+                $row->delete();
+                continue;
+            }
+            $seen[$courseId] = true;
+        }
     }
 }

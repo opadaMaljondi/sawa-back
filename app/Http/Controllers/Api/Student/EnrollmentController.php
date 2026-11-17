@@ -12,6 +12,7 @@ use App\Services\CourseRenewalDiscountService;
 use App\Services\InstructorEnrollmentWalletService;
 use App\Services\ReferralService;
 use App\Services\WalletService;
+use App\Support\EnrollmentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -207,17 +208,7 @@ class EnrollmentController extends Controller
                 $course->increment('students_count');
             }
 
-            // Notify admins
-            $notificationService = app(\App\Services\NotificationService::class);
-            $adminIds = \App\Models\User::where('type', 'admin')->pluck('id');
-            foreach ($adminIds as $adminId) {
-                $notificationService->sendToUser(
-                    $adminId,
-                    'اشتراك جديد',
-                    "قام الطالب {$student->full_name} بالاشتراك في: {$course->title}",
-                    ['course_id' => $course->id, 'student_id' => $student->id, 'type' => 'new_enrollment']
-                );
-            }
+            EnrollmentNotifier::notify($enrollment);
 
             return response()->json([
                 'message' => 'Enrolled successfully.',

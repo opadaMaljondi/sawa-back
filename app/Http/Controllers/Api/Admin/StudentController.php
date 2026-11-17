@@ -10,6 +10,7 @@ use App\Models\Wallet;
 use App\Services\CourseCommissionService;
 use App\Services\InstructorEnrollmentWalletService;
 use App\Services\WalletService;
+use App\Support\EnrollmentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -227,6 +228,7 @@ class StudentController extends Controller
         }
 
         app(InstructorEnrollmentWalletService::class)->creditInstructorForEnrollment($enrollment);
+        EnrollmentNotifier::notify($enrollment);
 
         return response()->json([
             'message' => 'Student enrolled successfully.',

@@ -364,12 +364,13 @@ class CourseController extends Controller
     public function approve($courseId)
     {
         $course = Course::findOrFail($courseId);
+        $alreadyPublished = $course->status === 'published';
         $course->update([
             'status' => 'published',
             'active' => true,
         ]);
 
-        if ($course->instructor_id) {
+        if (! $alreadyPublished && $course->instructor_id) {
             app(NotificationService::class)->sendToUser(
                 (int) $course->instructor_id,
                 'تم قبول كورسك',
