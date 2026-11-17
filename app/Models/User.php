@@ -129,20 +129,12 @@ class User extends Authenticatable
         if (!$courseId) {
             return false;
         }
-        if ($lesson->is_free || (float) ($lesson->price ?? 0) <= 0) {
-            return true;
-        }
-
         $course = \App\Models\Course::find($courseId);
-        if ($course && (float) ($course->price ?? 0) <= 0) {
+        if ($lesson->is_free || ($course && (float) ($course->price ?? 0) <= 0)) {
             return true;
         }
 
         $section = $lesson->section;
-        if ($section && (float) ($section->price ?? 0) <= 0) {
-            return true;
-        }
-
         $sectionId = $lesson->section_id ?? $section?->id;
 
         return Enrollment::where('student_id', $this->id)
@@ -167,11 +159,8 @@ class User extends Authenticatable
         if ($this->type !== 'student') return false;
 
         $note = \App\Models\Note::find($noteId);
-        if ($note && ($note->is_free || (float) ($note->price ?? 0) <= 0)) {
-            return true;
-        }
         $course = \App\Models\Course::find($courseId);
-        if ($course && (float) ($course->price ?? 0) <= 0) {
+        if (($note && $note->is_free) || ($course && (float) ($course->price ?? 0) <= 0)) {
             return true;
         }
 

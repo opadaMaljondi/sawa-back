@@ -99,11 +99,17 @@ class EnrollmentController extends Controller
                 $request->note_id
             );
 
-            if ($price <= 0) {
+            if ($price <= 0 && $request->type === 'full_course') {
                 return response()->json([
-                    'message' => 'This item is free and already available.',
+                    'message' => 'This course is free and already available.',
                     'free' => true,
                 ]);
+            }
+
+            if ($price <= 0) {
+                return response()->json([
+                    'message' => 'This item is included with the course.',
+                ], 422);
             }
 
             $originalPrice = $price;

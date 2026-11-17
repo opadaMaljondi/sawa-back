@@ -240,18 +240,15 @@ class CourseController extends Controller
             $course, $hasFullCourse, $enrolledSectionIds, $enrolledLessonIds
         ) {
             $courseFree = (float) ($course->price ?? 0) <= 0;
-            $sectionFree = $courseFree || (float) ($section->price ?? 0) <= 0;
             $sectionAccessible = $hasFullCourse
-                || $sectionFree
+                || $courseFree
                 || in_array($section->id, $enrolledSectionIds);
 
             $lessons = $section->lessons->map(function ($lesson) use (
-                $course, $hasFullCourse, $sectionAccessible, $enrolledLessonIds, $sectionFree
+                $course, $hasFullCourse, $sectionAccessible, $enrolledLessonIds, $courseFree
             ) {
-                $lessonFree = $lesson->is_free
-                    || $sectionFree
-                    || (float) ($lesson->price ?? 0) <= 0;
-                $lessonAccessible = $lessonFree
+                $lessonAccessible = $lesson->is_free
+                    || $courseFree
                     || $hasFullCourse
                     || $sectionAccessible
                     || in_array($lesson->id, $enrolledLessonIds);
@@ -293,7 +290,6 @@ class CourseController extends Controller
 
         foreach ($course->notes as $note) {
             $noteAccessible = $note->is_free
-                || (float) ($note->price ?? 0) <= 0
                 || (float) ($course->price ?? 0) <= 0
                 || $hasFullCourse
                 || in_array($note->id, $enrolledNoteIds);
